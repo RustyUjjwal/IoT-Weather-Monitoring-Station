@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STM32 IoT Environmental Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Header Section -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-title">
+                    <h1>STM32 IoT Environmental Dashboard</h1>
+                    <div class="header-status">
+                        <span class="status status--success" id="connectionStatus">
+                            <span class="status-dot"></span>
+                            Connected
+                        </span>
+                        <span class="timestamp" id="currentTime"></span>
+                        <span class="device-count">Devices: <span id="deviceCount">1</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <main class="dashboard">
+        <div class="container">
+            <!-- Sensor Cards -->
+            <section class="sensor-cards">
+                <div class="sensor-card" data-sensor="temperature">
+                    <div class="sensor-icon">🌡️</div>
+                    <div class="sensor-info">
+                        <h3>Temperature</h3>
+                        <div class="sensor-value">
+                            <span class="value" id="tempValue">24.5</span>
+                            <span class="unit">°C</span>
+                            <span class="trend" id="tempTrend">↑</span>
+                        </div>
+                        <div class="sensor-status" id="tempStatus">Normal</div>
+                    </div>
+                </div>
+
+                <div class="sensor-card" data-sensor="humidity">
+                    <div class="sensor-icon">💧</div>
+                    <div class="sensor-info">
+                        <h3>Humidity</h3>
+                        <div class="sensor-value">
+                            <span class="value" id="humidityValue">62.3</span>
+                            <span class="unit">%</span>
+                            <span class="trend" id="humidityTrend">→</span>
+                        </div>
+                        <div class="sensor-status" id="humidityStatus">Normal</div>
+                    </div>
+                </div>
+
+                <div class="sensor-card" data-sensor="pressure">
+                    <div class="sensor-icon">📊</div>
+                    <div class="sensor-info">
+                        <h3>Pressure</h3>
+                        <div class="sensor-value">
+                            <span class="value" id="pressureValue">1013.2</span>
+                            <span class="unit">hPa</span>
+                            <span class="trend" id="pressureTrend">↑</span>
+                        </div>
+                        <div class="sensor-status" id="pressureStatus">Normal</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts and Control Panels -->
+            <div class="dashboard-grid">
+                <!-- Historical Data Chart -->
+                <section class="chart-section card">
+                    <div class="card__header">
+                        <h3>Historical Data</h3>
+                        <div class="time-controls">
+                            <button class="btn btn--sm time-btn active" data-time="1H">1H</button>
+                            <button class="btn btn--sm time-btn" data-time="6H">6H</button>
+                            <button class="btn btn--sm time-btn" data-time="24H">24H</button>
+                            <button class="btn btn--sm time-btn" data-time="7D">7D</button>
+                        </div>
+                    </div>
+                    <div class="card__body">
+                        <div class="chart-container" style="position: relative; height: 300px;">
+                            <canvas id="sensorChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Device Information Panel -->
+                <section class="device-info card">
+                    <div class="card__header">
+                        <h3>Device Information</h3>
+                    </div>
+                    <div class="card__body">
+                        <div class="info-item">
+                            <span class="label">Device ID:</span>
+                            <span class="value" id="deviceId">STM32_001</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Firmware:</span>
+                            <span class="value" id="firmwareVersion">v2.1.3</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Last Update:</span>
+                            <span class="value" id="lastUpdate">Just now</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Signal Strength:</span>
+                            <div class="signal-strength">
+                                <span class="value" id="signalStrength">85%</span>
+                                <div class="signal-bars">
+                                    <div class="bar active"></div>
+                                    <div class="bar active"></div>
+                                    <div class="bar active"></div>
+                                    <div class="bar active"></div>
+                                    <div class="bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Battery Level:</span>
+                            <div class="battery-level">
+                                <span class="value" id="batteryLevel">78%</span>
+                                <div class="battery-indicator">
+                                    <div class="battery-fill" style="width: 78%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Control Panel -->
+                <section class="control-panel card">
+                    <div class="card__header">
+                        <h3>Control Panel</h3>
+                    </div>
+                    <div class="card__body">
+                        <div class="control-group">
+                            <label class="form-label">Refresh Rate</label>
+                            <select class="form-control" id="refreshRate">
+                                <option value="1000">1 second</option>
+                                <option value="5000" selected>5 seconds</option>
+                                <option value="30000">30 seconds</option>
+                                <option value="60000">60 seconds</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label class="form-label">Data Collection</label>
+                            <button class="btn btn--primary" id="toggleCollection">
+                                <span id="collectionStatus">Stop</span> Collection
+                            </button>
+                        </div>
+                        <div class="control-group">
+                            <button class="btn btn--secondary" id="exportData">Export Data</button>
+                            <button class="btn btn--outline" id="alertSettings">Alert Settings</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Alert System -->
+                <section class="alerts-section card">
+                    <div class="card__header">
+                        <h3>Recent Alerts</h3>
+                    </div>
+                    <div class="card__body">
+                        <div class="alerts-list" id="alertsList">
+                            <div class="alert-item warning">
+                                <div class="alert-time">14:02</div>
+                                <div class="alert-content">
+                                    <div class="alert-type">Warning - Humidity</div>
+                                    <div class="alert-message">Approaching upper threshold</div>
+                                </div>
+                            </div>
+                            <div class="alert-item info">
+                                <div class="alert-time">13:45</div>
+                                <div class="alert-content">
+                                    <div class="alert-type">Info - Temperature</div>
+                                    <div class="alert-message">Readings stable</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Alert Settings Modal -->
+    <div class="modal hidden" id="alertModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Alert Threshold Settings</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="threshold-group">
+                    <h4>Temperature (°C)</h4>
+                    <div class="threshold-inputs">
+                        <div class="input-group">
+                            <label>Min:</label>
+                            <input type="number" class="form-control" id="tempMin" value="18">
+                        </div>
+                        <div class="input-group">
+                            <label>Max:</label>
+                            <input type="number" class="form-control" id="tempMax" value="28">
+                        </div>
+                    </div>
+                </div>
+                <div class="threshold-group">
+                    <h4>Humidity (%)</h4>
+                    <div class="threshold-inputs">
+                        <div class="input-group">
+                            <label>Min:</label>
+                            <input type="number" class="form-control" id="humidityMin" value="45">
+                        </div>
+                        <div class="input-group">
+                            <label>Max:</label>
+                            <input type="number" class="form-control" id="humidityMax" value="75">
+                        </div>
+                    </div>
+                </div>
+                <div class="threshold-group">
+                    <h4>Pressure (hPa)</h4>
+                    <div class="threshold-inputs">
+                        <div class="input-group">
+                            <label>Min:</label>
+                            <input type="number" class="form-control" id="pressureMin" value="995">
+                        </div>
+                        <div class="input-group">
+                            <label>Max:</label>
+                            <input type="number" class="form-control" id="pressureMax" value="1015">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--secondary" id="cancelSettings">Cancel</button>
+                <button class="btn btn--primary" id="saveSettings">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
