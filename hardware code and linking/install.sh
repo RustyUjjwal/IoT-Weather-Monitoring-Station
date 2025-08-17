@@ -1,50 +1,40 @@
 #!/bin/bash
-# STM32 IoT Environmental Monitor - Installation Script
-# This script sets up the development environment and dependencies
-
 echo "========================================="
 echo "STM32 IoT Environmental Monitor Setup"
 echo "========================================="
 
-# Check if Python is installed
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is required but not installed"
+    echo "Python 3 is required but not installed"
     echo "Please install Python 3.7 or later"
     exit 1
 fi
 
-echo "✅ Python 3 found"
+echo "Python 3 found"
 
-# Create virtual environment
-echo "📦 Creating Python virtual environment..."
+echo "Creating Python virtual environment..."
 python3 -m venv venv
 
-# Activate virtual environment
 source venv/bin/activate
 
-# Install Python dependencies
-echo "📥 Installing Python dependencies..."
+echo "Installing Python dependencies..."
 pip install --upgrade pip
 pip install paho-mqtt==1.6.1
 pip install sqlite3
 
 echo "✅ Python dependencies installed"
 
-# Create necessary directories
 mkdir -p logs
 mkdir -p data
 mkdir -p config
 
-echo "📁 Created project directories"
+echo "Created project directories"
 
-# Set up database
-echo "🗄️ Initializing database..."
+echo "Initializing database..."
 python3 iot_mqtt_broker.py --init-db
 
-# Make scripts executable
 chmod +x iot_mqtt_broker.py
 
-echo "🚀 Installation completed successfully!"
+echo "Installation completed successfully!"
 echo ""
 echo "Next steps:"
 echo "1. Configure your hardware according to README.md"

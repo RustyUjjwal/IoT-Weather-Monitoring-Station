@@ -1,50 +1,31 @@
 
-/*
- * STM32 IoT Environmental Monitoring System
- * Arduino IDE Compatible Code
- * Supports: STM32F103C8T6 (Blue Pill) and similar boards
- * 
- * Hardware Connections:
- * BME280 Sensor:    ESP8266 WiFi:
- * VCC -> 3.3V       VCC -> 3.3V
- * GND -> GND        GND -> GND  
- * SDA -> PB7        TX -> PA10
- * SCL -> PB6        RX -> PA9
- */
-
 #include <Wire.h>
 #include <Adafruit_BME280.h>
 #include <SoftwareSerial.h>
 #include <ArduinoJson.h>
 #include <EEPROM.h>
 
-// Pin Definitions
 #define ESP8266_TX PA9
 #define ESP8266_RX PA10
 #define LED_PIN PC13
 #define BUTTON_PIN PA0
 
-// Sensor Configuration
 #define SEALEVELPRESSURE_HPA (1013.25)
 #define BME_SDA PB7
 #define BME_SCL PB6
 
-// WiFi and MQTT Configuration
 #define WIFI_SSID_MAX_LEN 32
 #define WIFI_PASS_MAX_LEN 64
 #define MQTT_SERVER_MAX_LEN 64
 #define DEVICE_ID "STM32_001"
 
-// Timing Configuration
-#define SENSOR_READ_INTERVAL 5000  // 5 seconds
-#define MQTT_PUBLISH_INTERVAL 10000 // 10 seconds
-#define WIFI_RETRY_INTERVAL 30000   // 30 seconds
+#define SENSOR_READ_INTERVAL 5000  
+#define MQTT_PUBLISH_INTERVAL 10000
+#define WIFI_RETRY_INTERVAL 30000 
 
-// Objects and Variables
 Adafruit_BME280 bme;
 SoftwareSerial esp8266(ESP8266_RX, ESP8266_TX);
 
-// Data Structures
 struct SensorData {
   float temperature;
   float humidity;
@@ -62,7 +43,6 @@ struct WiFiConfig {
   uint8_t checksum;
 };
 
-// Global Variables
 SensorData currentData;
 WiFiConfig wifiConfig;
 bool wifiConnected = false;
@@ -72,7 +52,6 @@ unsigned long lastMqttPublish = 0;
 unsigned long lastWifiRetry = 0;
 bool configMode = false;
 
-// Function Prototypes
 void setup();
 void loop();
 bool initializeSensors();
@@ -91,34 +70,28 @@ bool sendATCommand(String command, String expectedResponse, int timeout);
 void resetESP8266();
 
 void setup() {
-  // Initialize Serial Communications
   Serial.begin(115200);
   esp8266.begin(115200);
 
-  // Initialize Pins
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-  // Welcome Message
   Serial.println("========================================");
   Serial.println("STM32 IoT Environmental Monitor v2.0");
   Serial.println("Device ID: " + String(DEVICE_ID));
   Serial.println("========================================");
 
-  // Load Configuration
   loadWiFiConfig();
 
-  // Check if config button is pressed during startup
   if (digitalRead(BUTTON_PIN) == LOW) {
     enterConfigMode();
   }
 
-  // Initialize Hardware
   if (!initializeSensors()) {
     Serial.println("Sensor initialization failed!");
     blinkLED(5, 200);
   } else {
-    Serial.println("✅ Sensors initialized successfully");
+    Serial.println("Sensors initialized successfully");
   }
 
   if (!initializeWiFi()) {
@@ -126,7 +99,6 @@ void setup() {
     blinkLED(3, 500);
   }
 
-  // Initial sensor reading
   currentData = readSensors();
   if (currentData.valid) {
     Serial.println("Initial sensor reading successful");
@@ -142,10 +114,8 @@ void setup() {
 void loop() {
   unsigned long currentTime = millis();
 
-  // Handle Serial Commands
   handleSerialCommands();
 
-  // Check Config Button
   if (digitalRead(BUTTON_PIN) == LOW) {
     delay(50); // Debounce
     if (digitalRead(BUTTON_PIN) == LOW) {
@@ -153,19 +123,17 @@ void loop() {
     }
   }
 
-  // Read Sensors Periodically
   if (currentTime - lastSensorRead >= SENSOR_READ_INTERVAL) {
     currentData = readSensors();
     lastSensorRead = currentTime;
 
     if (currentData.valid) {
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Toggle LED
-      Serial.printf("📊 Sensors: T=%.1f°C, H=%.1f%%, P=%.1fhPa\n", 
+      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+      Serial.printf("Sensors: T=%.1f°C, H=%.1f%%, P=%.1fhPa\n", 
                    currentData.temperature, currentData.humidity, currentData.pressure);
     }
   }
 
-  // WiFi Connection Management
   if (!wifiConnected && (currentTime - lastWifiRetry >= WIFI_RETRY_INTERVAL)) {
     if (wifiConfig.configured) {
       wifiConnected = connectToWiFi();
@@ -173,7 +141,6 @@ void loop() {
     }
   }
 
-  // MQTT Connection and Data Publishing
   if (wifiConnected && currentData.valid && 
       (currentTime - lastMqttPublish >= MQTT_PUBLISH_INTERVAL)) {
 
@@ -194,14 +161,14 @@ void loop() {
     }
   }
 
-  delay(100); // Small delay for stability
+  delay(100);
 }
 
 bool initializeSensors() {
   Wire.begin(BME_SDA, BME_SCL);
 
-  if (!bme.begin(0x76)) { // Try default address
-    if (!bme.begin(0x77)) { // Try alternate address
+  if (!bme.begin(0x76)) { 
+    if (!bme.begin(0x77)) { 
       Serial.println("BME280 sensor not found!");
       return false;
     }
@@ -209,9 +176,9 @@ bool initializeSensors() {
 
   // Configure sensor settings
   bme.setSampling(Adafruit_BME280::MODE_NORMAL,
-                  Adafruit_BME280::SAMPLING_X2,  // Temperature
-                  Adafruit_BME280::SAMPLING_X16, // Pressure
-                  Adafruit_BME280::SAMPLING_X1,  // Humidity
+                  Adafruit_BME280::SAMPLING_X2,
+                  Adafruit_BME280::SAMPLING_X16,
+                  Adafruit_BME280::SAMPLING_X1,
                   Adafruit_BME280::FILTER_X16,
                   Adafruit_BME280::STANDBY_MS_500);
 
@@ -222,20 +189,17 @@ bool initializeSensors() {
 bool initializeWiFi() {
   Serial.println("Initializing ESP8266...");
   resetESP8266();
-
-  // Test AT communication
+  
   if (!sendATCommand("AT", "OK", 2000)) {
     Serial.println("ESP8266 not responding to AT commands");
     return false;
   }
 
-  // Set WiFi mode to Station
   if (!sendATCommand("AT+CWMODE=1", "OK", 2000)) {
     Serial.println("Failed to set WiFi mode");
     return false;
   }
 
-  // Disable auto-connect to avoid conflicts
   sendATCommand("AT+CWAUTOCONN=0", "OK", 2000);
 
   Serial.println("ESP8266 initialized successfully");
@@ -247,18 +211,15 @@ SensorData readSensors() {
   data.timestamp = millis();
   data.valid = false;
 
-  // Check if sensor is ready
   if (!bme.begin()) {
     Serial.println("BME280 sensor read failed");
     return data;
   }
 
-  // Read sensor values
   data.temperature = bme.readTemperature();
   data.humidity = bme.readHumidity();
-  data.pressure = bme.readPressure() / 100.0F; // Convert to hPa
+  data.pressure = bme.readPressure() / 100.0F;
 
-  // Validate readings
   if (isnan(data.temperature) || isnan(data.humidity) || isnan(data.pressure) ||
       data.temperature < -40 || data.temperature > 85 ||
       data.humidity < 0 || data.humidity > 100 ||
@@ -284,7 +245,6 @@ bool connectToWiFi() {
   if (sendATCommand(command, "WIFI CONNECTED", 15000)) {
     delay(2000);
 
-    // Get IP address
     if (sendATCommand("AT+CIFSR", "+CIFSR:STAIP", 3000)) {
       Serial.println("WiFi connected successfully");
       return true;
@@ -300,10 +260,8 @@ bool connectToMQTT() {
 
   Serial.printf("Connecting to MQTT server: %s:%d\n", wifiConfig.mqtt_server, wifiConfig.mqtt_port);
 
-  // Set connection mode
   if (!sendATCommand("AT+CIPMODE=0", "OK", 2000)) return false;
 
-  // Start TCP connection to MQTT broker
   String connectCmd = "AT+CIPSTART="TCP","" + String(wifiConfig.mqtt_server) + ""," + String(wifiConfig.mqtt_port);
 
   if (!sendATCommand(connectCmd, "CONNECT", 10000)) {
@@ -311,7 +269,6 @@ bool connectToMQTT() {
     return false;
   }
 
-  // MQTT CONNECT packet (simplified)
   String mqttConnect = "\x10\x12\x00\x04MQTT\x04\x02\x00\x3c\x00\x08STM32_001";
   String dataCmd = "AT+CIPSEND=" + String(mqttConnect.length());
 
@@ -336,8 +293,7 @@ bool publishSensorData(SensorData data) {
   String payload = createJsonPayload(data);
   String topic = "sensors/" + String(DEVICE_ID) + "/data";
 
-  // Create MQTT PUBLISH packet (simplified)
-  String mqttPublish = "\x30"; // PUBLISH packet type
+  String mqttPublish = "\x30";
   String packetContent = "\x00" + String((char)topic.length()) + topic + payload;
   mqttPublish += String((char)(packetContent.length())) + packetContent;
 
@@ -352,7 +308,6 @@ bool publishSensorData(SensorData data) {
       return true;
     }
   }
-
   return false;
 }
 
@@ -433,7 +388,6 @@ void enterConfigMode() {
   portStr.trim();
   int port = portStr.length() > 0 ? portStr.toInt() : 1883;
 
-  // Save configuration
   strncpy(wifiConfig.ssid, ssid.c_str(), WIFI_SSID_MAX_LEN - 1);
   strncpy(wifiConfig.password, password.c_str(), WIFI_PASS_MAX_LEN - 1);
   strncpy(wifiConfig.mqtt_server, mqttServer.c_str(), MQTT_SERVER_MAX_LEN - 1);
@@ -449,7 +403,7 @@ void enterConfigMode() {
 }
 
 void saveWiFiConfig() {
-  // Calculate checksum
+
   uint8_t* configBytes = (uint8_t*)&wifiConfig;
   uint8_t checksum = 0;
   for (int i = 0; i < sizeof(WiFiConfig) - 1; i++) {
@@ -457,7 +411,6 @@ void saveWiFiConfig() {
   }
   wifiConfig.checksum = checksum;
 
-  // Write to EEPROM
   for (int i = 0; i < sizeof(WiFiConfig); i++) {
     EEPROM.write(i, configBytes[i]);
   }
@@ -465,13 +418,12 @@ void saveWiFiConfig() {
 }
 
 void loadWiFiConfig() {
-  // Read from EEPROM
+
   uint8_t* configBytes = (uint8_t*)&wifiConfig;
   for (int i = 0; i < sizeof(WiFiConfig); i++) {
     configBytes[i] = EEPROM.read(i);
   }
 
-  // Verify checksum
   uint8_t checksum = 0;
   for (int i = 0; i < sizeof(WiFiConfig) - 1; i++) {
     checksum ^= configBytes[i];
@@ -527,11 +479,9 @@ void resetESP8266() {
   // delay(100);
   // digitalWrite(ESP_RESET_PIN, HIGH);
 
-  // Software reset
   esp8266.println("AT+RST");
   delay(3000);
 
-  // Clear any remaining data
   while (esp8266.available()) {
     esp8266.read();
   }

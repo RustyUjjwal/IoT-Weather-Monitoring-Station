@@ -1,4 +1,3 @@
-// STM32 IoT Environmental Monitor - Configuration Header
 // config.h - Centralized configuration for the project
 
 #ifndef CONFIG_H
@@ -22,19 +21,19 @@
 #define SEALEVEL_PRESSURE_HPA 1013.25
 
 // Timing Configuration (milliseconds)
-#define SENSOR_READ_INTERVAL 5000        // 5 seconds
-#define MQTT_PUBLISH_INTERVAL 10000      // 10 seconds
-#define WIFI_RETRY_INTERVAL 30000        // 30 seconds
-#define STATUS_BLINK_INTERVAL 1000       // 1 second
-#define WATCHDOG_TIMEOUT 60000           // 1 minute
+#define SENSOR_READ_INTERVAL 5000        
+#define MQTT_PUBLISH_INTERVAL 10000     
+#define WIFI_RETRY_INTERVAL 30000       
+#define STATUS_BLINK_INTERVAL 1000       
+#define WATCHDOG_TIMEOUT 60000          
 
 // Communication Configuration
 #define SERIAL_BAUD_RATE 115200
 #define ESP8266_BAUD_RATE 115200
-#define I2C_FREQUENCY 100000             // 100kHz
+#define I2C_FREQUENCY 100000             
 
 // WiFi Configuration
-#define WIFI_CONNECTION_TIMEOUT 15000    // 15 seconds
+#define WIFI_CONNECTION_TIMEOUT 15000   
 #define WIFI_MAX_RETRY_ATTEMPTS 3
 #define WIFI_SSID_MAX_LENGTH 32
 #define WIFI_PASSWORD_MAX_LENGTH 64
@@ -43,7 +42,7 @@
 #define MQTT_SERVER_MAX_LENGTH 64
 #define MQTT_PORT_DEFAULT 1883
 #define MQTT_CLIENT_ID_PREFIX "STM32_"
-#define MQTT_KEEPALIVE_INTERVAL 60       // 60 seconds
+#define MQTT_KEEPALIVE_INTERVAL 60       
 #define MQTT_QOS_LEVEL 1
 #define MQTT_RETAIN_FLAG true
 
@@ -88,7 +87,7 @@
 
 // Power Management
 #define LOW_POWER_MODE_ENABLED false
-#define SLEEP_MODE_DURATION 30000        // 30 seconds
+#define SLEEP_MODE_DURATION 30000        
 #define BATTERY_MONITORING_ENABLED false
 
 // Device Identification
@@ -108,4 +107,4 @@
 #define ERROR_RESET_ENABLED true
 #define WATCHDOG_ENABLED true
 
-#endif // CONFIG_H
+#endif
