@@ -1,10 +1,4 @@
 
-/*
- * ESP8266 WiFi Manager for STM32 IoT Project
- * Standalone ESP8266 code with WiFiManager capabilities
- * Upload this to ESP8266 if using it as a separate module
- */
-
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
@@ -12,24 +6,20 @@
 #include <EEPROM.h>
 #include <PubSubClient.h>
 
-// Configuration
 #define SERIAL_BAUD 115200
 #define CONFIG_AP_NAME "STM32_IoT_Config"
 #define CONFIG_AP_PASSWORD "config123"
 #define MQTT_BUFFER_SIZE 512
 #define CONFIG_TIMEOUT 180 // 3 minutes
 
-// Pin Definitions
 #define LED_PIN 2
 #define RESET_PIN 0
 
-// Global Objects
 WiFiManager wifiManager;
 ESP8266WebServer server(80);
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
-// Configuration Structure
 struct Config {
   char mqtt_server[64];
   int mqtt_port;
@@ -43,9 +33,8 @@ struct Config {
 Config config;
 bool mqttConnected = false;
 unsigned long lastMqttAttempt = 0;
-const unsigned long mqttRetryInterval = 30000; // 30 seconds
+const unsigned long mqttRetryInterval = 30000;
 
-// Function Prototypes
 void setup();
 void loop();
 void setupWiFiManager();
@@ -70,17 +59,15 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   pinMode(RESET_PIN, INPUT_PULLUP);
 
-  digitalWrite(LED_PIN, HIGH); // LED off initially
+  digitalWrite(LED_PIN, HIGH);
 
   Serial.println("\n========================================");
   Serial.println("ESP8266 WiFi Manager for STM32 IoT");
   Serial.println("Version: 2.0");
   Serial.println("========================================");
 
-  // Load configuration
   loadConfig();
 
-  // Check if reset button is pressed
   if (digitalRead(RESET_PIN) == LOW) {
     Serial.println("🔄 Reset button pressed - clearing WiFi config");
     wifiManager.resetSettings();
@@ -89,7 +76,6 @@ void setup() {
 
   setupWiFiManager();
 
-  // Setup web server routes
   server.on("/", handleRoot);
   server.on("/config", handleConfig);
   server.on("/save", HTTP_POST, handleSave);
@@ -99,25 +85,23 @@ void setup() {
   server.begin();
   Serial.println("✅ Web server started");
 
-  // Setup MQTT
+
   if (config.configured && strlen(config.mqtt_server) > 0) {
     mqttClient.setServer(config.mqtt_server, config.mqtt_port);
     mqttClient.setCallback(mqttCallback);
     mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
   }
 
-  Serial.println("🚀 ESP8266 ready for STM32 communication");
+  Serial.println("ESP8266 ready for STM32 communication");
   blinkLED(3, 200);
 }
 
 void loop() {
-  // Handle WiFi Manager
+
   wifiManager.process();
 
-  // Handle web server
   server.handleClient();
 
-  // Handle MQTT connection
   if (WiFi.status() == WL_CONNECTED) {
     if (config.configured && !mqttClient.connected()) {
       if (millis() - lastMqttAttempt > mqttRetryInterval) {
@@ -128,23 +112,20 @@ void loop() {
 
     if (mqttClient.connected()) {
       mqttClient.loop();
-      digitalWrite(LED_PIN, LOW); // LED on when connected
+      digitalWrite(LED_PIN, LOW);
     } else {
-      digitalWrite(LED_PIN, HIGH); // LED off when disconnected
+      digitalWrite(LED_PIN, HIGH); 
     }
   }
 
-  // Handle STM32 serial communication
   handleSTM32Data();
 
   delay(10);
 }
 
 void setupWiFiManager() {
-  // Set callback for when configuration is saved
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  // Add custom parameters for MQTT configuration
   WiFiManagerParameter custom_mqtt_server("mqtt_server", "MQTT Server", config.mqtt_server, 64);
   WiFiManagerParameter custom_mqtt_port("mqtt_port", "MQTT Port", String(config.mqtt_port).c_str(), 6);
   WiFiManagerParameter custom_mqtt_user("mqtt_user", "MQTT Username", config.mqtt_user, 32);
@@ -157,26 +138,23 @@ void setupWiFiManager() {
   wifiManager.addParameter(&custom_mqtt_password);
   wifiManager.addParameter(&custom_device_id);
 
-  // Set configuration portal timeout
   wifiManager.setConfigPortalTimeout(CONFIG_TIMEOUT);
 
-  // Set minimum signal quality
   wifiManager.setMinimumSignalQuality(20);
 
-  // Auto connect or start configuration portal
   if (!wifiManager.autoConnect(CONFIG_AP_NAME, CONFIG_AP_PASSWORD)) {
-    Serial.println("❌ Failed to connect and configuration timeout reached");
+    Serial.println("Failed to connect and configuration timeout reached");
     delay(3000);
     ESP.restart();
   }
 
-  Serial.println("✅ WiFi connected successfully");
-  Serial.printf("   IP address: %s\n", WiFi.localIP().toString().c_str());
-  Serial.printf("   RSSI: %d dBm\n", WiFi.RSSI());
+  Serial.println("WiFi connected successfully");
+  Serial.printf("IP address: %s\n", WiFi.localIP().toString().c_str());
+  Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
 }
 
 void saveConfigCallback() {
-  Serial.println("💾 Configuration saved via WiFiManager");
+  Serial.println("Configuration saved via WiFiManager");
 
   // Get parameters
   strcpy(config.mqtt_server, wifiManager.getParameters()[0]->getValue());
@@ -191,7 +169,6 @@ void saveConfigCallback() {
   config.configured = true;
   saveConfig();
 
-  // Setup MQTT with new configuration
   mqttClient.setServer(config.mqtt_server, config.mqtt_port);
 }
 
@@ -218,11 +195,11 @@ void handleRoot() {
 </head>
 <body>
     <div class="container">
-        <h1>🌐 ESP8266 WiFi Manager</h1>
-        <h2>📊 Status</h2>
+        <h1>ESP8266 WiFi Manager</h1>
+        <h2>tatus</h2>
         <div id="status">Loading...</div>
 
-        <h2>⚙️ MQTT Configuration</h2>
+        <h2>MQTT Configuration</h2>
         <form action="/save" method="post" class="config-form">
             <label>MQTT Server:</label>
             <input type="text" name="mqtt_server" value=")rawliteral" + String(config.mqtt_server) + R"rawliteral(" required>
@@ -239,12 +216,12 @@ void handleRoot() {
             <label>Device ID:</label>
             <input type="text" name="device_id" value=")rawliteral" + String(config.device_id) + R"rawliteral(" required>
 
-            <button type="submit">💾 Save Configuration</button>
+            <button type="submit">Save Configuration</button>
         </form>
 
         <h2>🔧 Actions</h2>
-        <button onclick="location.href='/reset'">🔄 Reset WiFi Settings</button>
-        <button onclick="updateStatus()">🔄 Refresh Status</button>
+        <button onclick="location.href='/reset'">Reset WiFi Settings</button>
+        <button onclick="updateStatus()">Refresh Status</button>
     </div>
 
     <script>
@@ -254,11 +231,11 @@ void handleRoot() {
                 .then(data => {
                     document.getElementById('status').innerHTML = 
                         '<div class="' + (data.wifi_connected ? 'connected' : 'disconnected') + '">' +
-                        '📶 WiFi: ' + (data.wifi_connected ? 'Connected (' + data.ip + ')' : 'Disconnected') + '</div>' +
+                        'WiFi: ' + (data.wifi_connected ? 'Connected (' + data.ip + ')' : 'Disconnected') + '</div>' +
                         '<div class="' + (data.mqtt_connected ? 'connected' : 'disconnected') + '">' +
-                        '📡 MQTT: ' + (data.mqtt_connected ? 'Connected' : 'Disconnected') + '</div>' +
-                        '<div>🆔 Device ID: ' + data.device_id + '</div>' +
-                        '<div>📈 Uptime: ' + data.uptime + 's</div>';
+                        'MQTT: ' + (data.mqtt_connected ? 'Connected' : 'Disconnected') + '</div>' +
+                        '<div>Device ID: ' + data.device_id + '</div>' +
+                        '<div>Uptime: ' + data.uptime + 's</div>';
                 });
         }
         updateStatus();
@@ -286,7 +263,6 @@ void handleSave() {
     config.configured = true;
     saveConfig();
 
-    // Setup MQTT with new configuration
     mqttClient.setServer(config.mqtt_server, config.mqtt_port);
 
     server.send(200, "text/html", 
@@ -294,7 +270,7 @@ void handleSave() {
                 "<p>MQTT settings have been updated.</p>"
                 "<a href='/'>← Back to Dashboard</a></body></html>");
   } else {
-    server.send(400, "text/html", "<html><body><h1>❌ Error</h1><p>Missing parameters</p></body></html>");
+    server.send(400, "text/html", "<html><body><h1>Error</h1><p>Missing parameters</p></body></html>");
   }
 }
 
@@ -305,7 +281,7 @@ void handleStatus() {
 void handleReset() {
   wifiManager.resetSettings();
   server.send(200, "text/html", 
-              "<html><body><h1>🔄 WiFi Settings Reset</h1>"
+              "<html><body><h1>WiFi Settings Reset</h1>"
               "<p>The device will restart and enter configuration mode.</p></body></html>");
   delay(2000);
   ESP.restart();
@@ -314,7 +290,6 @@ void handleReset() {
 void loadConfig() {
   EEPROM.get(0, config);
 
-  // Verify checksum
   uint8_t* configBytes = (uint8_t*)&config;
   uint8_t checksum = 0;
   for (int i = 0; i < sizeof(Config) - 1; i++) {
@@ -322,19 +297,19 @@ void loadConfig() {
   }
 
   if (checksum != config.checksum || !config.configured) {
-    Serial.println("⚠️ Invalid or missing configuration, using defaults");
+    Serial.println("Invalid or missing configuration, using defaults");
     memset(&config, 0, sizeof(Config));
     strcpy(config.mqtt_server, "mqtt.broker.com");
     config.mqtt_port = 1883;
     strcpy(config.device_id, "STM32_001");
     config.configured = false;
   } else {
-    Serial.printf("✅ Configuration loaded: %s:%d\n", config.mqtt_server, config.mqtt_port);
+    Serial.printf("Configuration loaded: %s:%d\n", config.mqtt_server, config.mqtt_port);
   }
 }
 
 void saveConfig() {
-  // Calculate checksum
+  
   uint8_t* configBytes = (uint8_t*)&config;
   uint8_t checksum = 0;
   for (int i = 0; i < sizeof(Config) - 1; i++) {
@@ -344,13 +319,13 @@ void saveConfig() {
 
   EEPROM.put(0, config);
   EEPROM.commit();
-  Serial.println("💾 Configuration saved to EEPROM");
+  Serial.println("Configuration saved to EEPROM");
 }
 
 void connectToMQTT() {
   if (!config.configured || strlen(config.mqtt_server) == 0) return;
 
-  Serial.printf("🔗 Connecting to MQTT: %s:%d\n", config.mqtt_server, config.mqtt_port);
+  Serial.printf("Connecting to MQTT: %s:%d\n", config.mqtt_server, config.mqtt_port);
 
   String clientId = String(config.device_id) + "_" + String(WiFi.macAddress());
 
@@ -362,20 +337,20 @@ void connectToMQTT() {
   }
 
   if (connected) {
-    Serial.println("✅ MQTT connected");
+    Serial.println("MQTT connected");
     mqttConnected = true;
 
-    // Subscribe to control topics
+
     String controlTopic = "sensors/" + String(config.device_id) + "/control";
     mqttClient.subscribe(controlTopic.c_str());
 
-    // Publish online status
+
     String statusTopic = "sensors/" + String(config.device_id) + "/status";
     mqttClient.publish(statusTopic.c_str(), "online", true);
 
     blinkLED(2, 100);
   } else {
-    Serial.printf("❌ MQTT connection failed, rc=%d\n", mqttClient.state());
+    Serial.printf("MQTT connection failed, rc=%d\n", mqttClient.state());
     mqttConnected = false;
   }
 }
@@ -398,21 +373,21 @@ void handleSTM32Data() {
     data.trim();
 
     if (data.startsWith("SENSOR:")) {
-      // Parse sensor data from STM32
+
       String sensorData = data.substring(7);
 
       if (mqttClient.connected() && config.configured) {
         String topic = "sensors/" + String(config.device_id) + "/data";
 
         if (mqttClient.publish(topic.c_str(), sensorData.c_str())) {
-          Serial.println("📤 Sensor data published to MQTT");
+          Serial.println("Sensor data published to MQTT");
         } else {
-          Serial.println("❌ Failed to publish sensor data");
+          Serial.println("Failed to publish sensor data");
         }
       }
     }
     else if (data.startsWith("CMD:")) {
-      // Handle commands from STM32
+
       String command = data.substring(4);
 
       if (command == "STATUS") {
