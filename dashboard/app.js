@@ -1,1040 +1,335 @@
-// // STM32 IoT Environmental Dashboard - JavaScript
-// class IoTDashboard {
-//     constructor() {
-//         // Initial data from the provided JSON
-//         this.sensorData = {
-//             temperature: { current: 24.5, unit: "°C", min: 20, max: 30, critical_min: 15, critical_max: 35 },
-//             humidity: { current: 62.3, unit: "%", min: 40, max: 80, critical_min: 30, critical_max: 90 },
-//             pressure: { current: 1013.2, unit: "hPa", min: 990, max: 1020, critical_min: 980, critical_max: 1030 }
-//         };
+// app.js
 
-//         this.deviceInfo = {
-//             deviceId: "STM32_001",
-//             firmwareVersion: "v2.1.3",
-//             signalStrength: 85,
-//             batteryLevel: 78,
-//             connectionStatus: "Connected",
-//             lastUpdate: new Date().toISOString()
-//         };
+/**
+ * @class SerialConnector
+ * Handles all communication with the physical device using the Web Serial API.
+ */
+class SerialConnector {
+    #port = null;
+    #reader = null;
+    #writer = null;
+    #encoder = new TextEncoder();
+    #decoder = new TextDecoder();
+    #onDataCallback;
+    #onStateChangeCallback;
 
-//         this.thresholds = {
-//             temperature: { min: 18, max: 28 },
-//             humidity: { min: 45, max: 75 },
-//             pressure: { min: 995, max: 1015 }
-//         };
-
-//         this.historicalData = [];
-//         this.alerts = [];
-//         this.isCollecting = true;
-//         this.refreshInterval = 5000; // 5 seconds default
-//         this.updateTimer = null;
-//         this.chart = null;
-//         this.currentTimeRange = '1H';
-        
-//         this.previousValues = { ...this.sensorData };
-
-//         this.init();
-//     }
-
-//     init() {
-//         this.generateInitialHistoricalData();
-//         this.setupEventListeners();
-//         this.initializeChart();
-//         this.updateDisplay();
-//         this.startDataCollection();
-//         this.updateClock();
-//     }
-
-//     generateInitialHistoricalData() {
-//         const now = new Date();
-//         const points = 60; // Generate 60 data points for the last hour
-        
-//         for (let i = points; i >= 0; i--) {
-//             const timestamp = new Date(now.getTime() - (i * 60000)); // Every minute
-//             const timeString = timestamp.toLocaleTimeString('en-US', { 
-//                 hour12: false, 
-//                 hour: '2-digit', 
-//                 minute: '2-digit' 
-//             });
-            
-//             this.historicalData.push({
-//                 timestamp: timeString,
-//                 fullTimestamp: timestamp,
-//                 temperature: this.generateRealisticValue('temperature', 24.5, i),
-//                 humidity: this.generateRealisticValue('humidity', 62.3, i),
-//                 pressure: this.generateRealisticValue('pressure', 1013.2, i)
-//             });
-//         }
-//     }
-
-//     generateRealisticValue(sensor, baseValue, index) {
-//         const noise = (Math.random() - 0.5) * 2;
-//         const cycle = Math.sin(index * 0.1) * 0.5;
-        
-//         switch (sensor) {
-//             case 'temperature':
-//                 return Math.round((baseValue + cycle + noise) * 10) / 10;
-//             case 'humidity':
-//                 return Math.round((baseValue + cycle * 2 + noise) * 10) / 10;
-//             case 'pressure':
-//                 return Math.round((baseValue + cycle * 0.5 + noise * 0.1) * 10) / 10;
-//         }
-//     }
-
-//     setupEventListeners() {
-//         // Time range buttons
-//         document.querySelectorAll('.time-btn').forEach(btn => {
-//             btn.addEventListener('click', (e) => {
-//                 this.changeTimeRange(e.target.dataset.time);
-//             });
-//         });
-
-//         // Refresh rate selector
-//         document.getElementById('refreshRate').addEventListener('change', (e) => {
-//             this.changeRefreshRate(parseInt(e.target.value));
-//         });
-
-//         // Collection toggle
-//         document.getElementById('toggleCollection').addEventListener('click', () => {
-//             this.toggleDataCollection();
-//         });
-
-//         // Export data
-//         document.getElementById('exportData').addEventListener('click', () => {
-//             this.exportData();
-//         });
-
-//         // Alert settings modal
-//         document.getElementById('alertSettings').addEventListener('click', () => {
-//             this.openAlertSettings();
-//         });
-
-//         document.getElementById('closeModal').addEventListener('click', () => {
-//             this.closeAlertSettings();
-//         });
-
-//         document.getElementById('cancelSettings').addEventListener('click', () => {
-//             this.closeAlertSettings();
-//         });
-
-//         document.getElementById('saveSettings').addEventListener('click', () => {
-//             this.saveAlertSettings();
-//         });
-
-//         // Close modal on background click
-//         document.getElementById('alertModal').addEventListener('click', (e) => {
-//             if (e.target.id === 'alertModal') {
-//                 this.closeAlertSettings();
-//             }
-//         });
-
-//         // Sensor card hover effects
-//         document.querySelectorAll('.sensor-card').forEach(card => {
-//             card.addEventListener('mouseenter', () => {
-//                 card.style.transform = 'translateY(-4px)';
-//             });
-            
-//             card.addEventListener('mouseleave', () => {
-//                 card.style.transform = 'translateY(0)';
-//             });
-//         });
-//     }
-
-//     initializeChart() {
-//         const ctx = document.getElementById('sensorChart').getContext('2d');
-        
-//         this.chart = new Chart(ctx, {
-//             type: 'line',
-//             data: {
-//                 labels: this.getChartLabels(),
-//                 datasets: [
-//                     {
-//                         label: 'Temperature (°C)',
-//                         data: this.getChartData('temperature'),
-//                         borderColor: '#6ac6f9',
-//                         backgroundColor: 'rgba(106, 198, 249, 0.1)',
-//                         borderWidth: 2,
-//                         fill: false,
-//                         tension: 0.4
-//                     },
-//                     {
-//                         label: 'Humidity (%)',
-//                         data: this.getChartData('humidity'),
-//                         borderColor: '#fbed63',
-//                         backgroundColor: 'rgba(251, 237, 99, 0.1)',
-//                         borderWidth: 2,
-//                         fill: false,
-//                         tension: 0.4
-//                     },
-//                     {
-//                         label: 'Pressure (hPa)',
-//                         data: this.getChartData('pressure').map(p => p - 1000), // Scale for visibility
-//                         borderColor: '#ffb748',
-//                         backgroundColor: 'rgba(255, 183, 72, 0.1)',
-//                         borderWidth: 2,
-//                         fill: false,
-//                         tension: 0.4,
-//                         yAxisID: 'pressure'
-//                     }
-//                 ]
-//             },
-//             options: {
-//                 responsive: true,
-//                 maintainAspectRatio: false,
-//                 interaction: {
-//                     intersect: false,
-//                     mode: 'index'
-//                 },
-//                 plugins: {
-//                     legend: {
-//                         position: 'top'
-//                     },
-//                     tooltip: {
-//                         callbacks: {
-//                             label: function(context) {
-//                                 let label = context.dataset.label;
-//                                 if (label === 'Pressure (hPa)') {
-//                                     return label + ': ' + (context.parsed.y + 1000).toFixed(1);
-//                                 }
-//                                 return label + ': ' + context.parsed.y.toFixed(1);
-//                             }
-//                         }
-//                     }
-//                 },
-//                 scales: {
-//                     x: {
-//                         display: true,
-//                         title: {
-//                             display: true,
-//                             text: 'Time'
-//                         }
-//                     },
-//                     y: {
-//                         type: 'linear',
-//                         display: true,
-//                         position: 'left',
-//                         title: {
-//                             display: true,
-//                             text: 'Temperature (°C) / Humidity (%)'
-//                         }
-//                     },
-//                     pressure: {
-//                         type: 'linear',
-//                         display: true,
-//                         position: 'right',
-//                         title: {
-//                             display: true,
-//                             text: 'Pressure (hPa above 1000)'
-//                         },
-//                         grid: {
-//                             drawOnChartArea: false
-//                         }
-//                     }
-//                 }
-//             }
-//         });
-//     }
-
-//     getChartLabels() {
-//         const dataToShow = this.getDataForTimeRange();
-//         return dataToShow.map(item => item.timestamp);
-//     }
-
-//     getChartData(sensor) {
-//         const dataToShow = this.getDataForTimeRange();
-//         return dataToShow.map(item => item[sensor]);
-//     }
-
-//     getDataForTimeRange() {
-//         const now = new Date();
-//         let cutoffTime;
-
-//         switch (this.currentTimeRange) {
-//             case '1H':
-//                 cutoffTime = new Date(now.getTime() - 60 * 60 * 1000);
-//                 break;
-//             case '6H':
-//                 cutoffTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
-//                 break;
-//             case '24H':
-//                 cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-//                 break;
-//             case '7D':
-//                 cutoffTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-//                 break;
-//             default:
-//                 cutoffTime = new Date(now.getTime() - 60 * 60 * 1000);
-//         }
-
-//         return this.historicalData.filter(item => 
-//             item.fullTimestamp && item.fullTimestamp >= cutoffTime
-//         );
-//     }
-
-//     changeTimeRange(timeRange) {
-//         this.currentTimeRange = timeRange;
-        
-//         // Update active button
-//         document.querySelectorAll('.time-btn').forEach(btn => {
-//             btn.classList.remove('active');
-//         });
-//         document.querySelector(`[data-time="${timeRange}"]`).classList.add('active');
-
-//         // Update chart
-//         this.updateChart();
-//     }
-
-//     updateChart() {
-//         if (!this.chart) return;
-
-//         this.chart.data.labels = this.getChartLabels();
-//         this.chart.data.datasets[0].data = this.getChartData('temperature');
-//         this.chart.data.datasets[1].data = this.getChartData('humidity');
-//         this.chart.data.datasets[2].data = this.getChartData('pressure').map(p => p - 1000);
-//         this.chart.update('none');
-//     }
-
-//     simulateSensorData() {
-//         // Store previous values for trend calculation
-//         this.previousValues = {
-//             temperature: { current: this.sensorData.temperature.current },
-//             humidity: { current: this.sensorData.humidity.current },
-//             pressure: { current: this.sensorData.pressure.current }
-//         };
-
-//         // Generate new realistic sensor values
-//         this.sensorData.temperature.current = this.generateNewValue(
-//             this.sensorData.temperature.current, 20, 30, 0.2
-//         );
-//         this.sensorData.humidity.current = this.generateNewValue(
-//             this.sensorData.humidity.current, 40, 80, 0.5
-//         );
-//         this.sensorData.pressure.current = this.generateNewValue(
-//             this.sensorData.pressure.current, 990, 1020, 0.1
-//         );
-
-//         // Update device info
-//         this.deviceInfo.lastUpdate = new Date().toISOString();
-//         this.deviceInfo.signalStrength = Math.max(70, Math.min(100, 
-//             this.deviceInfo.signalStrength + (Math.random() - 0.5) * 10
-//         ));
-//         this.deviceInfo.batteryLevel = Math.max(0, Math.min(100,
-//             this.deviceInfo.batteryLevel - Math.random() * 0.1
-//         ));
-
-//         // Add to historical data
-//         const now = new Date();
-//         this.historicalData.push({
-//             timestamp: now.toLocaleTimeString('en-US', { 
-//                 hour12: false, 
-//                 hour: '2-digit', 
-//                 minute: '2-digit' 
-//             }),
-//             fullTimestamp: now,
-//             temperature: this.sensorData.temperature.current,
-//             humidity: this.sensorData.humidity.current,
-//             pressure: this.sensorData.pressure.current
-//         });
-
-//         // Keep only last 1000 data points to prevent memory issues
-//         if (this.historicalData.length > 1000) {
-//             this.historicalData.shift();
-//         }
-
-//         // Check for alerts
-//         this.checkAlerts();
-//     }
-
-//     generateNewValue(current, min, max, volatility) {
-//         const change = (Math.random() - 0.5) * 2 * volatility;
-//         let newValue = current + change;
-        
-//         // Keep within realistic bounds but allow some deviation
-//         newValue = Math.max(min - 5, Math.min(max + 5, newValue));
-        
-//         return Math.round(newValue * 10) / 10;
-//     }
-
-//     checkAlerts() {
-//         const sensors = ['temperature', 'humidity', 'pressure'];
-        
-//         sensors.forEach(sensor => {
-//             const current = this.sensorData[sensor].current;
-//             const threshold = this.thresholds[sensor];
-//             const critical = this.sensorData[sensor];
-            
-//             let alertType = null;
-//             let message = '';
-            
-//             if (current <= critical.critical_min || current >= critical.critical_max) {
-//                 alertType = 'critical';
-//                 message = `${sensor} in critical range: ${current}${this.sensorData[sensor].unit}`;
-//             } else if (current <= threshold.min || current >= threshold.max) {
-//                 alertType = 'warning';
-//                 message = `${sensor} outside normal range: ${current}${this.sensorData[sensor].unit}`;
-//             }
-            
-//             if (alertType) {
-//                 this.addAlert(alertType, sensor, message);
-//             }
-//         });
-//     }
-
-//     addAlert(type, sensor, message) {
-//         // Avoid duplicate alerts for the same condition
-//         const recentAlert = this.alerts.find(alert => 
-//             alert.sensor === sensor && 
-//             alert.message === message &&
-//             (Date.now() - new Date(alert.timestamp).getTime()) < 60000 // Within last minute
-//         );
-        
-//         if (!recentAlert) {
-//             const alert = {
-//                 timestamp: new Date().toLocaleTimeString('en-US', { 
-//                     hour12: false, 
-//                     hour: '2-digit', 
-//                     minute: '2-digit' 
-//                 }),
-//                 type: type,
-//                 sensor: sensor,
-//                 message: message
-//             };
-            
-//             this.alerts.unshift(alert);
-            
-//             // Keep only last 50 alerts
-//             if (this.alerts.length > 50) {
-//                 this.alerts.pop();
-//             }
-            
-//             this.updateAlertsDisplay();
-//         }
-//     }
-
-//     updateDisplay() {
-//         this.updateSensorCards();
-//         this.updateDeviceInfo();
-//         this.updateChart();
-//         this.updateClock();
-//     }
-
-//     updateSensorCards() {
-//         // Update sensor values and trends
-//         const sensors = ['temperature', 'humidity', 'pressure'];
-        
-//         sensors.forEach(sensor => {
-//             const current = this.sensorData[sensor].current;
-//             const previous = this.previousValues[sensor]?.current || current;
-//             const threshold = this.thresholds[sensor];
-//             const critical = this.sensorData[sensor];
-            
-//             // Update value
-//             document.getElementById(sensor === 'temperature' ? 'tempValue' : 
-//                 sensor === 'humidity' ? 'humidityValue' : 'pressureValue').textContent = current;
-            
-//             // Update trend
-//             const trendElement = document.getElementById(sensor === 'temperature' ? 'tempTrend' : 
-//                 sensor === 'humidity' ? 'humidityTrend' : 'pressureTrend');
-            
-//             if (current > previous) {
-//                 trendElement.textContent = '↑';
-//                 trendElement.style.color = 'var(--color-success)';
-//             } else if (current < previous) {
-//                 trendElement.textContent = '↓';
-//                 trendElement.style.color = 'var(--color-error)';
-//             } else {
-//                 trendElement.textContent = '→';
-//                 trendElement.style.color = 'var(--color-text-secondary)';
-//             }
-            
-//             // Update status
-//             const statusElement = document.getElementById(sensor === 'temperature' ? 'tempStatus' : 
-//                 sensor === 'humidity' ? 'humidityStatus' : 'pressureStatus');
-            
-//             let status = 'normal';
-//             let statusText = 'Normal';
-            
-//             if (current <= critical.critical_min || current >= critical.critical_max) {
-//                 status = 'critical';
-//                 statusText = 'Critical';
-//             } else if (current <= threshold.min || current >= threshold.max) {
-//                 status = 'warning';
-//                 statusText = 'Warning';
-//             }
-            
-//             statusElement.className = `sensor-status ${status}`;
-//             statusElement.textContent = statusText;
-//         });
-//     }
-
-//     updateDeviceInfo() {
-//         document.getElementById('deviceId').textContent = this.deviceInfo.deviceId;
-//         document.getElementById('firmwareVersion').textContent = this.deviceInfo.firmwareVersion;
-//         document.getElementById('lastUpdate').textContent = 'Just now';
-        
-//         // Update signal strength
-//         const signalStrength = Math.round(this.deviceInfo.signalStrength);
-//         document.getElementById('signalStrength').textContent = signalStrength + '%';
-        
-//         // Update signal bars
-//         const bars = document.querySelectorAll('.signal-bars .bar');
-//         bars.forEach((bar, index) => {
-//             if ((index + 1) * 20 <= signalStrength) {
-//                 bar.classList.add('active');
-//             } else {
-//                 bar.classList.remove('active');
-//             }
-//         });
-        
-//         // Update battery level
-//         const batteryLevel = Math.round(this.deviceInfo.batteryLevel);
-//         document.getElementById('batteryLevel').textContent = batteryLevel + '%';
-//         document.querySelector('.battery-fill').style.width = batteryLevel + '%';
-        
-//         // Update battery color based on level
-//         const batteryFill = document.querySelector('.battery-fill');
-//         if (batteryLevel > 50) {
-//             batteryFill.style.background = 'var(--color-success)';
-//         } else if (batteryLevel > 20) {
-//             batteryFill.style.background = 'var(--color-warning)';
-//         } else {
-//             batteryFill.style.background = 'var(--color-error)';
-//         }
-//     }
-
-//     updateAlertsDisplay() {
-//         const alertsList = document.getElementById('alertsList');
-        
-//         if (this.alerts.length === 0) {
-//             alertsList.innerHTML = '<div class="alert-item info"><div class="alert-content"><div class="alert-message">No recent alerts</div></div></div>';
-//             return;
-//         }
-        
-//         alertsList.innerHTML = this.alerts.slice(0, 10).map(alert => `
-//             <div class="alert-item ${alert.type}">
-//                 <div class="alert-time">${alert.timestamp}</div>
-//                 <div class="alert-content">
-//                     <div class="alert-type">${alert.type.charAt(0).toUpperCase() + alert.type.slice(1)} - ${alert.sensor.charAt(0).toUpperCase() + alert.sensor.slice(1)}</div>
-//                     <div class="alert-message">${alert.message}</div>
-//                 </div>
-//             </div>
-//         `).join('');
-//     }
-
-//     updateClock() {
-//         const now = new Date();
-//         const timeString = now.toLocaleString('en-US', {
-//             hour12: false,
-//             year: 'numeric',
-//             month: '2-digit',
-//             day: '2-digit',
-//             hour: '2-digit',
-//             minute: '2-digit',
-//             second: '2-digit'
-//         });
-        
-//         document.getElementById('currentTime').textContent = timeString;
-//     }
-
-//     changeRefreshRate(rate) {
-//         this.refreshInterval = rate;
-        
-//         if (this.isCollecting) {
-//             this.stopDataCollection();
-//             this.startDataCollection();
-//         }
-//     }
-
-//     toggleDataCollection() {
-//         if (this.isCollecting) {
-//             this.stopDataCollection();
-//         } else {
-//             this.startDataCollection();
-//         }
-//     }
-
-//     startDataCollection() {
-//         this.isCollecting = true;
-//         document.getElementById('collectionStatus').textContent = 'Stop';
-//         document.getElementById('toggleCollection').classList.remove('btn--secondary');
-//         document.getElementById('toggleCollection').classList.add('btn--primary');
-        
-//         this.updateTimer = setInterval(() => {
-//             this.simulateSensorData();
-//             this.updateDisplay();
-//         }, this.refreshInterval);
-        
-//         // Update clock every second
-//         this.clockTimer = setInterval(() => {
-//             this.updateClock();
-//         }, 1000);
-//     }
-
-//     stopDataCollection() {
-//         this.isCollecting = false;
-//         document.getElementById('collectionStatus').textContent = 'Start';
-//         document.getElementById('toggleCollection').classList.remove('btn--primary');
-//         document.getElementById('toggleCollection').classList.add('btn--secondary');
-        
-//         if (this.updateTimer) {
-//             clearInterval(this.updateTimer);
-//         }
-        
-//         if (this.clockTimer) {
-//             clearInterval(this.clockTimer);
-//         }
-//     }
-
-//     exportData() {
-//         const dataToExport = {
-//             timestamp: new Date().toISOString(),
-//             currentData: this.sensorData,
-//             deviceInfo: this.deviceInfo,
-//             historicalData: this.historicalData.slice(-100), // Last 100 readings
-//             alerts: this.alerts.slice(0, 20) // Last 20 alerts
-//         };
-        
-//         const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {
-//             type: 'application/json'
-//         });
-        
-//         const url = URL.createObjectURL(blob);
-//         const a = document.createElement('a');
-//         a.href = url;
-//         a.download = `stm32_iot_data_${new Date().toISOString().split('T')[0]}.json`;
-//         document.body.appendChild(a);
-//         a.click();
-//         document.body.removeChild(a);
-//         URL.revokeObjectURL(url);
-//     }
-
-//     openAlertSettings() {
-//         // Populate current threshold values
-//         document.getElementById('tempMin').value = this.thresholds.temperature.min;
-//         document.getElementById('tempMax').value = this.thresholds.temperature.max;
-//         document.getElementById('humidityMin').value = this.thresholds.humidity.min;
-//         document.getElementById('humidityMax').value = this.thresholds.humidity.max;
-//         document.getElementById('pressureMin').value = this.thresholds.pressure.min;
-//         document.getElementById('pressureMax').value = this.thresholds.pressure.max;
-        
-//         document.getElementById('alertModal').classList.remove('hidden');
-//     }
-
-//     closeAlertSettings() {
-//         document.getElementById('alertModal').classList.add('hidden');
-//     }
-
-//     saveAlertSettings() {
-//         this.thresholds.temperature.min = parseFloat(document.getElementById('tempMin').value);
-//         this.thresholds.temperature.max = parseFloat(document.getElementById('tempMax').value);
-//         this.thresholds.humidity.min = parseFloat(document.getElementById('humidityMin').value);
-//         this.thresholds.humidity.max = parseFloat(document.getElementById('humidityMax').value);
-//         this.thresholds.pressure.min = parseFloat(document.getElementById('pressureMin').value);
-//         this.thresholds.pressure.max = parseFloat(document.getElementById('pressureMax').value);
-        
-//         this.closeAlertSettings();
-        
-//         // Show success message (you could enhance this with a toast notification)
-//         console.log('Alert thresholds updated successfully');
-//     }
-// }
-
-// // Initialize the dashboard when DOM is loaded
-// document.addEventListener('DOMContentLoaded', () => {
-//     const dashboard = new IoTDashboard();
-    
-//     // Make dashboard globally accessible for debugging
-//     window.dashboard = dashboard;
-// });
-
-
-// STM32 IoT Environmental Dashboard - JavaScript (Live Data Version)
-class IoTDashboard {
-    constructor() {
-        // Initial placeholder data
-        this.sensorData = {
-            temperature: { current: 0, unit: "°C", critical_min: 15, critical_max: 35 },
-            humidity: { current: 0, unit: "%", critical_min: 30, critical_max: 90 },
-            pressure: { current: 0, unit: "hPa", critical_min: 980, critical_max: 1030 }
-        };
-
-        this.deviceInfo = {
-            deviceId: "STM32_001",
-            firmwareVersion: "v2.1.3",
-            signalStrength: 0,
-            batteryLevel: 100, // Assuming wired power for now
-            connectionStatus: "Disconnected",
-            lastUpdate: new Date().toISOString()
-        };
-
-        // User-configurable thresholds for warnings
-        this.thresholds = {
-            temperature: { min: 18, max: 28 },
-            humidity: { min: 45, max: 75 },
-            pressure: { min: 995, max: 1015 }
-        };
-
-        this.historicalData = [];
-        this.alerts = [];
-        this.chart = null;
-        this.currentTimeRange = '1H';
-        
-        // Store previous values to calculate trends
-        this.previousValues = {
-            temperature: { current: 0 },
-            humidity: { current: 0 },
-            pressure: { current: 0 }
-        };
-
-        this.init();
+    /**
+     * @param {function} onDataCallback - Function to call with parsed data.
+     * @param {function} onStateChangeCallback - Function to call with connection status (true/false).
+     */
+    constructor(onDataCallback, onStateChangeCallback) {
+        this.#onDataCallback = onDataCallback;
+        this.#onStateChangeCallback = onStateChangeCallback;
     }
 
-    init() {
-        this.generateInitialHistoricalData();
-        this.setupEventListeners();
-        this.initializeChart();
-        this.updateDisplay(); // Initial render
-        this.connectWebSocket(); // Connect to the live data feed
-        
-        // Start the clock
-        this.updateClock();
-        setInterval(() => this.updateClock(), 1000);
+    /** Checks if the browser supports the Web Serial API. */
+    isSupported() {
+        return 'serial' in navigator;
     }
 
-    connectWebSocket() {
-        // Assumes your Python broker is running on the same machine
-        const socket = new WebSocket('ws://localhost:8765');
-        const connectionStatusEl = document.getElementById('connectionStatus');
-
-        socket.onopen = () => {
-            console.log('✅ WebSocket connection established');
-            if(connectionStatusEl) {
-                connectionStatusEl.innerHTML = '<span class="status-dot"></span>Connected';
-                connectionStatusEl.className = 'status status--success';
-            }
-        };
-
-        socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                console.log('📨 Data received from broker:', data);
-
-                // Store previous values before updating
-                this.previousValues = {
-                    temperature: { current: this.sensorData.temperature.current },
-                    humidity: { current: this.sensorData.humidity.current },
-                    pressure: { current: this.sensorData.pressure.current }
-                };
-
-                // Update sensor data with live values
-                this.sensorData.temperature.current = data.temperature;
-                this.sensorData.humidity.current = data.humidity;
-                this.sensorData.pressure.current = data.pressure;
-                this.deviceInfo.firmwareVersion = data.firmware || this.deviceInfo.firmwareVersion;
-                this.deviceInfo.deviceId = data.deviceId || this.deviceInfo.deviceId;
-                this.deviceInfo.lastUpdate = new Date().toISOString();
-
-                // Add to historical data for the chart
-                const now = new Date();
-                this.historicalData.push({
-                    timestamp: now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-                    fullTimestamp: now,
-                    temperature: data.temperature,
-                    humidity: data.humidity,
-                    pressure: data.pressure
-                });
-                
-                // Keep historical data from growing indefinitely
-                if (this.historicalData.length > 1000) {
-                    this.historicalData.shift();
-                }
-
-                this.checkAlerts();
-                // Update the entire display with the new live data
-                this.updateDisplay();
-
-            } catch (error) {
-                console.error("Error parsing incoming WebSocket data:", error);
-            }
-        };
-
-        socket.onclose = () => {
-            console.log('⚠️ WebSocket connection closed. Retrying in 3 seconds...');
-             if(connectionStatusEl) {
-                connectionStatusEl.innerHTML = '<span class="status-dot" style="background-color: var(--color-error);"></span>Disconnected';
-                connectionStatusEl.className = 'status status--error';
-            }
-            // Attempt to reconnect after a delay
-            setTimeout(() => this.connectWebSocket(), 3000);
-        };
-
-        socket.onerror = (error) => {
-            console.error('❌ WebSocket error:', error);
-            socket.close();
-        };
+    /** Returns true if a device is currently connected. */
+    isConnected() {
+        return this.#port !== null;
     }
 
-    generateInitialHistoricalData() {
-        const now = new Date();
-        const points = 60; // Generate 60 empty data points for the last hour
-        
-        for (let i = points; i >= 0; i--) {
-            const timestamp = new Date(now.getTime() - (i * 60000)); // Every minute
-            const timeString = timestamp.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-            
-            this.historicalData.push({
-                timestamp: timeString,
-                fullTimestamp: timestamp,
-                temperature: null, // Start with null data
-                humidity: null,
-                pressure: null
-            });
+    /**
+     * Toggles the connection. If disconnected, it prompts the user to select a port and connect.
+     * If connected, it disconnects.
+     */
+    async toggleConnection() {
+        if (this.isConnected()) {
+            await this.#disconnect();
+        } else {
+            await this.#connect();
         }
     }
 
-    setupEventListeners() {
-        // Time range buttons
-        document.querySelectorAll('.time-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.changeTimeRange(e.target.dataset.time));
-        });
-
-        // The data collection controls are no longer needed with live data, but we keep the other listeners.
-        document.getElementById('exportData').addEventListener('click', () => this.exportData());
-        document.getElementById('alertSettings').addEventListener('click', () => this.openAlertSettings());
-        document.getElementById('closeModal').addEventListener('click', () => this.closeAlertSettings());
-        document.getElementById('cancelSettings').addEventListener('click', () => this.closeAlertSettings());
-        document.getElementById('saveSettings').addEventListener('click', () => this.saveAlertSettings());
-        document.getElementById('alertModal').addEventListener('click', (e) => {
-            if (e.target.id === 'alertModal') this.closeAlertSettings();
-        });
+    async #connect() {
+        try {
+            this.#port = await navigator.serial.requestPort();
+            await this.#port.open({ baudRate: 9600 });
+            this.#writer = this.#port.writable.getWriter();
+            this.#onStateChangeCallback(true);
+            this.#readLoop(); // Start listening for data
+        } catch (error) {
+            console.error("Connection cancelled or failed:", error);
+            this.#onStateChangeCallback(false);
+        }
     }
 
-    initializeChart() {
-        const ctx = document.getElementById('sensorChart').getContext('2d');
-        
-        this.chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: this.getChartLabels(),
-                datasets: [
-                    {
-                        label: 'Temperature (°C)',
-                        data: this.getChartData('temperature'),
-                        borderColor: '#6ac6f9',
-                        backgroundColor: 'rgba(106, 198, 249, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        spanGaps: true, // Connect lines over null data points
-                    },
-                    {
-                        label: 'Humidity (%)',
-                        data: this.getChartData('humidity'),
-                        borderColor: '#fbed63',
-                        backgroundColor: 'rgba(251, 237, 99, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        spanGaps: true,
-                    },
-                    {
-                        label: 'Pressure (hPa)',
-                        data: this.getChartData('pressure').map(p => p ? p - 1000 : null), // Scale for visibility
-                        borderColor: '#ffb748',
-                        backgroundColor: 'rgba(255, 183, 72, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        yAxisID: 'pressure',
-                        spanGaps: true,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { intersect: false, mode: 'index' },
-                plugins: {
-                    legend: { position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (context.parsed.y !== null) {
-                                    if (label.includes('Pressure')) {
-                                        return `${label}: ${(context.parsed.y + 1000).toFixed(1)}`;
-                                    }
-                                    return `${label}: ${context.parsed.y.toFixed(1)}`;
-                                }
-                                return label;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { display: true, title: { display: true, text: 'Time' } },
-                    y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Temp (°C) / Humidity (%)' } },
-                    pressure: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: { display: true, text: 'Pressure (hPa, offset by 1000)' },
-                        grid: { drawOnChartArea: false }
-                    }
+    async #disconnect() {
+        if (this.#reader) {
+            // Cancel the reader and ignore any errors that might occur
+            await this.#reader.cancel().catch(() => { });
+            this.#reader = null;
+        }
+        if (this.#writer) {
+            this.#writer.releaseLock();
+            this.#writer = null;
+        }
+        if (this.#port) {
+            await this.#port.close();
+            this.#port = null;
+        }
+        this.#onStateChangeCallback(false);
+    }
+
+    /** Continuously reads data from the serial port until disconnected. */
+    async #readLoop() {
+        let buffer = '';
+        this.#reader = this.#port.readable.getReader();
+        try {
+            while (true) {
+                const { value, done } = await this.#reader.read();
+                if (done) break;
+
+                buffer += this.#decoder.decode(value, { stream: true });
+                let newlineIndex;
+                // Process each complete line (ending in newline)
+                while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                    const line = buffer.slice(0, newlineIndex).trim();
+                    buffer = buffer.slice(newlineIndex + 1);
+                    if (line) this.#handleSerialData(line);
                 }
             }
-        });
-    }
-
-    getChartLabels() {
-        return this.getDataForTimeRange().map(item => item.timestamp);
-    }
-
-    getChartData(sensor) {
-        return this.getDataForTimeRange().map(item => item[sensor]);
-    }
-
-    getDataForTimeRange() {
-        const now = new Date();
-        let cutoffTime;
-
-        switch (this.currentTimeRange) {
-            case '1H': cutoffTime = new Date(now.getTime() - 60 * 60 * 1000); break;
-            case '6H': cutoffTime = new Date(now.getTime() - 6 * 60 * 60 * 1000); break;
-            case '24H': cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
-            case '7D': cutoffTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
-            default: cutoffTime = new Date(now.getTime() - 60 * 60 * 1000);
+        } catch (error) {
+            console.error("Read loop error:", error);
+        } finally {
+            this.#reader.releaseLock();
+            // Automatically handle disconnection if the read loop breaks
+            if (this.isConnected()) {
+                await this.#disconnect();
+            }
         }
-
-        return this.historicalData.filter(item => item.fullTimestamp && item.fullTimestamp >= cutoffTime);
     }
 
-    changeTimeRange(timeRange) {
-        this.currentTimeRange = timeRange;
-        document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector(`[data-time="${timeRange}"]`).classList.add('active');
-        this.updateChart();
+    /**
+     * Parses a line of incoming serial data and invokes the data callback.
+     * @param {string} line - A single line of text received from the device.
+     */
+    #handleSerialData(line) {
+        try {
+            const data = JSON.parse(line);
+            console.log('📨 Data received:', data);
+            this.#onDataCallback(data);
+        } catch (error) {
+            console.warn("Received non-JSON line:", line, error);
+        }
+    }
+}
+
+
+/**
+ * @class UIManager
+ * Manages all interactions with the DOM, keeping UI logic separate.
+ */
+class UIManager {
+    #elements = {};
+    #chartManager;
+
+    constructor(chartManager) {
+        this.#chartManager = chartManager;
+        this.#queryElements();
     }
 
-    updateChart() {
-        if (!this.chart) return;
-        this.chart.data.labels = this.getChartLabels();
-        this.chart.data.datasets[0].data = this.getChartData('temperature');
-        this.chart.data.datasets[1].data = this.getChartData('humidity');
-        this.chart.data.datasets[2].data = this.getChartData('pressure').map(p => p ? p - 1000 : null);
-        this.chart.update('none'); // Use 'none' for smoother updates
+    /** Caches all necessary DOM elements for quick access. */
+    #queryElements() {
+        this.#elements = {
+            // Connection
+            connectBtn: document.getElementById('connectDeviceBtn'),
+            connectionStatus: document.getElementById('connectionStatus'),
+            // Sensor Cards
+            tempValue: document.getElementById('tempValue'),
+            humidityValue: document.getElementById('humidityValue'),
+            pressureValue: document.getElementById('pressureValue'),
+            tempTrend: document.getElementById('tempTrend'),
+            humidityTrend: document.getElementById('humidityTrend'),
+            pressureTrend: document.getElementById('pressureTrend'),
+            tempStatus: document.getElementById('tempStatus'),
+            humidityStatus: document.getElementById('humidityStatus'),
+            pressureStatus: document.getElementById('pressureStatus'),
+            // Device Info
+            deviceId: document.getElementById('deviceId'),
+            firmwareVersion: document.getElementById('firmwareVersion'),
+            lastUpdate: document.getElementById('lastUpdate'),
+            signalStrength: document.getElementById('signalStrength'),
+            batteryLevel: document.getElementById('batteryLevel'),
+            batteryFill: document.querySelector('.battery-fill'),
+            signalBars: document.querySelectorAll('.signal-bars .bar'),
+            // Alerts
+            alertsList: document.getElementById('alertsList'),
+            alertModal: document.getElementById('alertModal'),
+            // Controls
+            themeToggle: document.getElementById('themeToggle'),
+            timeRangeButtons: document.querySelectorAll('.time-btn'),
+            refreshRate: document.getElementById('refreshRate'),
+            toggleCollection: document.getElementById('toggleCollection'),
+            currentTime: document.getElementById('currentTime'),
+            // Alert Modal Inputs
+            tempMin: document.getElementById('tempMin'),
+            tempMax: document.getElementById('tempMax'),
+            humidityMin: document.getElementById('humidityMin'),
+            humidityMax: document.getElementById('humidityMax'),
+            pressureMin: document.getElementById('pressureMin'),
+            pressureMax: document.getElementById('pressureMax'),
+        };
     }
 
-    checkAlerts() {
-        const sensors = ['temperature', 'humidity', 'pressure'];
-        sensors.forEach(sensor => {
-            const current = this.sensorData[sensor].current;
-            const threshold = this.thresholds[sensor];
-            const critical = this.sensorData[sensor];
-            
-            let alertType = null;
-            let message = '';
-            
-            if (current <= critical.critical_min || current >= critical.critical_max) {
-                alertType = 'critical';
-                message = `${sensor.charAt(0).toUpperCase() + sensor.slice(1)} in critical range: ${current}${this.sensorData[sensor].unit}`;
-            } else if (current <= threshold.min || current >= threshold.max) {
-                alertType = 'warning';
-                message = `${sensor.charAt(0).toUpperCase() + sensor.slice(1)} outside normal range: ${current}${this.sensorData[sensor].unit}`;
-            }
-            
-            if (alertType) {
-                this.addAlert(alertType, sensor, message);
-            }
+    /** Binds all event listeners to their respective handlers. */
+    bindEventListeners(handlers) {
+        this.#elements.connectBtn.addEventListener('click', handlers.onConnect);
+        this.#elements.themeToggle.addEventListener('change', (e) => this.applyTheme(e.target.checked ? 'dark' : 'light'));
+        this.#elements.timeRangeButtons.forEach(btn => btn.addEventListener('click', (e) => handlers.onChangeTimeRange(e.target.dataset.time)));
+
+        document.getElementById('exportData').addEventListener('click', handlers.onExportData);
+        document.getElementById('alertSettings').addEventListener('click', handlers.onOpenAlertSettings);
+        document.getElementById('closeAlertModal').addEventListener('click', handlers.onCloseAlertSettings);
+        document.getElementById('cancelSettings').addEventListener('click', handlers.onCloseAlertSettings);
+        document.getElementById('saveSettings').addEventListener('click', handlers.onSaveAlertSettings);
+        this.#elements.alertModal.addEventListener('click', (e) => {
+            if (e.target.id === 'alertModal') handlers.onCloseAlertSettings();
         });
+
+        // These controls are only for a simulated device, show an alert if used.
+        const simAlert = () => console.warn('Data collection and refresh rate controls are disabled when using a live device connection.');
+        this.#elements.refreshRate.addEventListener('change', simAlert);
+        this.#elements.toggleCollection.addEventListener('click', simAlert);
     }
 
-    addAlert(type, sensor, message) {
-        const recentAlert = this.alerts.find(alert => 
-            alert.sensor === sensor && (Date.now() - new Date(alert.fullTimestamp).getTime()) < 60000 // Within last minute
-        );
-        
-        if (!recentAlert) {
-            const now = new Date();
-            const alert = {
-                timestamp: now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-                fullTimestamp: now,
-                type: type,
-                sensor: sensor,
-                message: message
+    /** Initializes the theme based on localStorage. */
+    initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        this.applyTheme(savedTheme);
+    }
+
+    /** Applies and saves the selected color theme. */
+    applyTheme(theme) {
+        const isDark = theme === 'dark';
+        document.body.classList.toggle('dark-mode', isDark);
+        this.#elements.themeToggle.checked = isDark;
+        localStorage.setItem('theme', theme);
+        // Delay chart theme update to allow CSS variables to apply
+        if (this.#chartManager) {
+            setTimeout(() => this.#chartManager.updateTheme(), 50);
+        }
+    }
+
+    /** Updates the UI to reflect the connection state. */
+    setConnectionState(isConnected) {
+        if (isConnected) {
+            this.#elements.connectionStatus.innerHTML = `<span class="status-dot"></span>Connected`;
+            this.#elements.connectionStatus.className = 'status status--success';
+            this.#elements.connectBtn.innerHTML = `<span class="material-symbols-outlined">cable_off</span> Disconnect`;
+            this.#elements.connectBtn.classList.replace('btn--primary', 'btn--secondary');
+            this.#elements.refreshRate.disabled = true;
+            this.#elements.toggleCollection.disabled = true;
+        } else {
+            this.#elements.connectionStatus.innerHTML = `<span class="status-dot" style="background-color: var(--color-error);"></span>Disconnected`;
+            this.#elements.connectionStatus.className = 'status status--error';
+            this.#elements.connectBtn.innerHTML = `<span class="material-symbols-outlined">cable</span> Connect to Device`;
+            this.#elements.connectBtn.classList.replace('btn--secondary', 'btn--primary');
+            this.#elements.refreshRate.disabled = false;
+            this.#elements.toggleCollection.disabled = false;
+        }
+    }
+
+    /** Resets the entire dashboard to its default, disconnected state. */
+    resetDashboard() {
+        this.setConnectionState(false);
+        this.updateSensorCards({}, {}); // Use empty data to reset
+        this.updateDeviceInfo({});
+        this.updateAlertsDisplay([]);
+    }
+
+    /** Updates the three main sensor cards with new data. */
+    updateSensorCards(sensorData, previousValues, thresholds, criticalThresholds) {
+        ['temperature', 'humidity', 'pressure'].forEach(sensor => {
+            const data = sensorData[sensor] || {};
+            const prev = previousValues[sensor] || {};
+            const thresh = thresholds[sensor] || {};
+            const crit = criticalThresholds[sensor] || {};
+
+            const current = data.current ?? 0;
+            const previous = prev.current ?? current;
+
+            // Map sensor key to element IDs
+            const elMap = {
+                temperature: { val: 'tempValue', trend: 'tempTrend', status: 'tempStatus' },
+                humidity: { val: 'humidityValue', trend: 'humidityTrend', status: 'humidityStatus' },
+                pressure: { val: 'pressureValue', trend: 'pressureTrend', status: 'pressureStatus' },
             };
-            this.alerts.unshift(alert);
-            if (this.alerts.length > 50) this.alerts.pop();
-            this.updateAlertsDisplay();
-        }
-    }
 
-    updateDisplay() {
-        this.updateSensorCards();
-        this.updateDeviceInfo();
-        this.updateChart();
-        this.updateAlertsDisplay();
-    }
+            const valueEl = this.#elements[elMap[sensor].val];
+            const trendEl = this.#elements[elMap[sensor].trend];
+            const statusEl = this.#elements[elMap[sensor].status];
 
-    updateSensorCards() {
-        const sensors = ['temperature', 'humidity', 'pressure'];
-        sensors.forEach(sensor => {
-            const current = this.sensorData[sensor].current;
-            const previous = this.previousValues[sensor]?.current || current;
-            const threshold = this.thresholds[sensor];
-            const critical = this.sensorData[sensor];
-            
-            const valueEl = document.getElementById(sensor === 'temperature' ? 'tempValue' : sensor === 'humidity' ? 'humidityValue' : 'pressureValue');
-            const trendEl = document.getElementById(sensor === 'temperature' ? 'tempTrend' : sensor === 'humidity' ? 'humidityTrend' : 'pressureTrend');
-            const statusEl = document.getElementById(sensor === 'temperature' ? 'tempStatus' : sensor === 'humidity' ? 'humidityStatus' : 'pressureStatus');
-
-            if (valueEl) valueEl.textContent = current.toFixed(1);
-            
-            if (trendEl) {
-                if (current > previous) {
-                    trendEl.textContent = '↑';
-                    trendEl.style.color = 'var(--color-success)';
-                } else if (current < previous) {
-                    trendEl.textContent = '↓';
-                    trendEl.style.color = 'var(--color-error)';
-                } else {
-                    trendEl.textContent = '→';
-                    trendEl.style.color = 'var(--color-text-secondary)';
-                }
+            if (!sensorData[sensor]) { // Reset state
+                valueEl.textContent = sensor === 'pressure' ? '----.-' : '--.-';
+                trendEl.textContent = '';
+                statusEl.textContent = 'N/A';
+                statusEl.className = 'sensor-status';
+                return;
             }
-            
-            if (statusEl) {
-                let status = 'normal', statusText = 'Normal';
-                if (current <= critical.critical_min || current >= critical.critical_max) {
-                    status = 'critical'; statusText = 'Critical';
-                } else if (current <= threshold.min || current >= threshold.max) {
-                    status = 'warning'; statusText = 'Warning';
-                }
-                statusEl.className = `sensor-status ${status}`;
-                statusEl.textContent = statusText;
+
+            valueEl.textContent = current.toFixed(1);
+
+            if (current > previous) {
+                trendEl.textContent = '↑';
+                trendEl.style.color = 'var(--color-success)';
+            } else if (current < previous) {
+                trendEl.textContent = '↓';
+                trendEl.style.color = 'var(--color-error)';
+            } else {
+                trendEl.textContent = '→';
+                trendEl.style.color = 'var(--color-text-secondary)';
             }
+
+            let status = 'normal', statusText = 'Normal';
+            if (current <= crit.critical_min || current >= crit.critical_max) {
+                status = 'critical'; statusText = 'Critical';
+            } else if (current <= thresh.min || current >= thresh.max) {
+                status = 'warning'; statusText = 'Warning';
+            }
+            statusEl.className = `sensor-status ${status}`;
+            statusEl.textContent = statusText;
         });
     }
 
-    updateDeviceInfo() {
-        document.getElementById('deviceId').textContent = this.deviceInfo.deviceId;
-        document.getElementById('firmwareVersion').textContent = this.deviceInfo.firmwareVersion;
-        
-        const lastUpdateDate = new Date(this.deviceInfo.lastUpdate);
-        const secondsAgo = Math.round((new Date() - lastUpdateDate) / 1000);
-        document.getElementById('lastUpdate').textContent = secondsAgo < 5 ? 'Just now' : `${secondsAgo}s ago`;
+    /** Updates the device information panel. */
+    updateDeviceInfo(deviceInfo) {
+        this.#elements.deviceId.textContent = deviceInfo.deviceId || 'N/A';
+        this.#elements.firmwareVersion.textContent = deviceInfo.firmwareVersion || 'N/A';
+
+        if (deviceInfo.lastUpdate) {
+            const secondsAgo = Math.round((new Date() - new Date(deviceInfo.lastUpdate)) / 1000);
+            this.#elements.lastUpdate.textContent = secondsAgo < 5 ? 'Just now' : `${secondsAgo}s ago`;
+        } else {
+            this.#elements.lastUpdate.textContent = 'N/A';
+        }
+
+        const signalStrength = deviceInfo.signalStrength || 0;
+        this.#elements.signalStrength.textContent = `${signalStrength}%`;
+        this.#elements.signalBars.forEach((bar, index) => {
+            bar.classList.toggle('active', (index + 1) * 20 <= signalStrength);
+        });
+
+        const batteryLevel = deviceInfo.batteryLevel || 0;
+        this.#elements.batteryLevel.textContent = `${batteryLevel}%`;
+        if (this.#elements.batteryFill) {
+            this.#elements.batteryFill.style.width = `${batteryLevel}%`;
+            if (batteryLevel > 50) this.#elements.batteryFill.style.background = 'var(--color-success)';
+            else if (batteryLevel > 20) this.#elements.batteryFill.style.background = 'var(--color-warning)';
+            else this.#elements.batteryFill.style.background = 'var(--color-error)';
+        }
     }
 
-    updateAlertsDisplay() {
-        const alertsList = document.getElementById('alertsList');
-        if (!alertsList) return;
-
-        if (this.alerts.length === 0) {
-            alertsList.innerHTML = '<div class="alert-item info"><div class="alert-content"><div class="alert-message">No recent alerts</div></div></div>';
+    /** Renders the list of recent alerts. */
+    updateAlertsDisplay(alerts) {
+        if (alerts.length === 0) {
+            this.#elements.alertsList.innerHTML = '<div class="alert-item info"><div class="alert-content"><div class="alert-message">No recent alerts</div></div></div>';
             return;
         }
-        
-        alertsList.innerHTML = this.alerts.slice(0, 10).map(alert => `
+        this.#elements.alertsList.innerHTML = alerts.slice(0, 10).map(alert => `
             <div class="alert-item ${alert.type}">
                 <div class="alert-time">${alert.timestamp}</div>
                 <div class="alert-content">
@@ -1045,22 +340,399 @@ class IoTDashboard {
         `).join('');
     }
 
+    /** Updates the clock display every second. */
     updateClock() {
         const now = new Date();
         const timeString = now.toLocaleString('en-US', {
             year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
         }).replace(',', '');
-        document.getElementById('currentTime').textContent = timeString;
+        this.#elements.currentTime.textContent = timeString;
     }
 
-    exportData() {
+    /** Opens the alert settings modal and populates it with current values. */
+    openAlertSettings(thresholds) {
+        this.#elements.tempMin.value = thresholds.temperature.min;
+        this.#elements.tempMax.value = thresholds.temperature.max;
+        this.#elements.humidityMin.value = thresholds.humidity.min;
+        this.#elements.humidityMax.value = thresholds.humidity.max;
+        this.#elements.pressureMin.value = thresholds.pressure.min;
+        this.#elements.pressureMax.value = thresholds.pressure.max;
+        this.#elements.alertModal.classList.remove('hidden');
+    }
+
+    /** Closes the alert settings modal. */
+    closeAlertSettings() {
+        this.#elements.alertModal.classList.add('hidden');
+    }
+
+    /** Retrieves the current values from the alert settings modal inputs. */
+    getAlertSettingsValues() {
+        return {
+            temperature: {
+                min: parseFloat(this.#elements.tempMin.value),
+                max: parseFloat(this.#elements.tempMax.value)
+            },
+            humidity: {
+                min: parseFloat(this.#elements.humidityMin.value),
+                max: parseFloat(this.#elements.humidityMax.value)
+            },
+            pressure: {
+                min: parseFloat(this.#elements.pressureMin.value),
+                max: parseFloat(this.#elements.pressureMax.value)
+            }
+        };
+    }
+
+    /** Updates the active state of the time range buttons. */
+    updateActiveTimeRangeButton(timeRange) {
+        this.#elements.timeRangeButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.time === timeRange);
+        });
+    }
+}
+
+
+/**
+ * @class ChartManager
+ * Encapsulates all Chart.js instance and configuration logic.
+ */
+class ChartManager {
+    #chart = null;
+    #ctx;
+
+    constructor(canvasId) {
+        this.#ctx = document.getElementById(canvasId).getContext('2d');
+    }
+
+    /** Initializes the chart with default options and data. */
+    init(initialData) {
+        this.#chart = new Chart(this.#ctx, {
+            type: 'line',
+            data: {
+                labels: initialData.map(d => d.timestamp),
+                datasets: this.#createDatasets(initialData)
+            },
+            options: this.#createChartOptions()
+        });
+        this.updateTheme(); // Apply initial theme
+    }
+
+    /** Creates the dataset configuration for the chart. */
+    #createDatasets(data) {
+        const styles = getComputedStyle(document.body);
+        return [{
+            label: 'Temperature (°C)',
+            data: data.map(d => d.temperature),
+            borderColor: styles.getPropertyValue('--chart-color-temp').trim(),
+            backgroundColor: styles.getPropertyValue('--chart-bg-temp').trim(),
+            tension: 0.4,
+            spanGaps: true,
+        }, {
+            label: 'Humidity (%)',
+            data: data.map(d => d.humidity),
+            borderColor: styles.getPropertyValue('--chart-color-humidity').trim(),
+            backgroundColor: styles.getPropertyValue('--chart-bg-humidity').trim(),
+            tension: 0.4,
+            spanGaps: true,
+        }, {
+            label: 'Pressure (hPa)',
+            data: data.map(d => d.pressure ? d.pressure - 1000 : null), // Offset for better scaling
+            borderColor: styles.getPropertyValue('--chart-color-pressure').trim(),
+            backgroundColor: styles.getPropertyValue('--chart-bg-pressure').trim(),
+            tension: 0.4,
+            yAxisID: 'pressure',
+            spanGaps: true,
+        }];
+    }
+
+    /** Creates the options configuration object for the chart. */
+    #createChartOptions() {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            if (context.parsed.y === null) return label;
+                            // Add back the offset for pressure tooltips
+                            if (label.includes('Pressure')) {
+                                return `${label}: ${(context.parsed.y + 1000).toFixed(1)}`;
+                            }
+                            return `${label}: ${context.parsed.y.toFixed(1)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { title: { display: true, text: 'Time' } },
+                y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp (°C) / Humidity (%)' } },
+                pressure: { type: 'linear', position: 'right', title: { display: true, text: 'Pressure (hPa, offset by 1000)' }, grid: { drawOnChartArea: false } }
+            }
+        };
+    }
+
+    /** Updates the chart with new data. */
+    update(data) {
+        if (!this.#chart) return;
+        this.#chart.data.labels = data.map(item => item.timestamp);
+        this.#chart.data.datasets[0].data = data.map(item => item.temperature);
+        this.#chart.data.datasets[1].data = data.map(item => item.humidity);
+        this.#chart.data.datasets[2].data = data.map(item => item.pressure ? item.pressure - 1000 : null);
+        this.#chart.update('none'); // Use 'none' for a smooth update without animation
+    }
+
+    /** Updates chart colors to match the current theme (light/dark). */
+    updateTheme() {
+        if (!this.#chart) return;
+        const styles = getComputedStyle(document.body);
+        const textColor = styles.getPropertyValue('--color-text-secondary').trim();
+        const gridColor = styles.getPropertyValue('--color-border').trim();
+
+        // Update scales
+        Object.values(this.#chart.options.scales).forEach(scale => {
+            scale.grid.color = gridColor;
+            scale.ticks.color = textColor;
+            scale.title.color = textColor;
+        });
+
+        // Update legend
+        this.#chart.options.plugins.legend.labels.color = textColor;
+
+        // Update dataset colors
+        this.#chart.data.datasets[0].borderColor = styles.getPropertyValue('--chart-color-temp').trim();
+        this.#chart.data.datasets[0].backgroundColor = styles.getPropertyValue('--chart-bg-temp').trim();
+        this.#chart.data.datasets[1].borderColor = styles.getPropertyValue('--chart-color-humidity').trim();
+        this.#chart.data.datasets[1].backgroundColor = styles.getPropertyValue('--chart-bg-humidity').trim();
+        this.#chart.data.datasets[2].borderColor = styles.getPropertyValue('--chart-color-pressure').trim();
+        this.#chart.data.datasets[2].backgroundColor = styles.getPropertyValue('--chart-bg-pressure').trim();
+
+        this.#chart.update();
+    }
+}
+
+
+/**
+ * @class IoTDashboard
+ * The main application class. It manages state and orchestrates the other modules.
+ */
+class IoTDashboard {
+    // --- State Properties ---
+    #sensorData = {
+        temperature: { current: 0, unit: "°C", critical_min: 15, critical_max: 35 },
+        humidity: { current: 0, unit: "%", critical_min: 30, critical_max: 90 },
+        pressure: { current: 0, unit: "hPa", critical_min: 980, critical_max: 1030 }
+    };
+    #deviceInfo = { deviceId: "N/A", firmwareVersion: "N/A", lastUpdate: null };
+    #thresholds = {
+        temperature: { min: 18, max: 28 },
+        humidity: { min: 45, max: 75 },
+        pressure: { min: 995, max: 1015 }
+    };
+    #historicalData = [];
+    #alerts = [];
+    #currentTimeRange = '1H';
+    #previousValues = { temperature: {}, humidity: {}, pressure: {} };
+
+    // --- Modules ---
+    #ui;
+    #chart;
+    #connector;
+
+    constructor() {
+        this.#chart = new ChartManager('sensorChart');
+        this.#ui = new UIManager(this.#chart);
+        this.#connector = new SerialConnector(
+            (data) => this.#handleSerialData(data),
+            (isConnected) => this.#handleConnectionStateChange(isConnected)
+        );
+    }
+
+    /** Initializes the application. */
+    init() {
+        this.#ui.initTheme();
+        this.#generateInitialHistoricalData();
+        this.#chart.init(this.#getFilteredDataForTimeRange());
+
+        this.#ui.bindEventListeners({
+            onConnect: () => this.#handleConnect(),
+            onChangeTimeRange: (time) => this.#changeTimeRange(time),
+            onExportData: () => this.#exportData(),
+            onOpenAlertSettings: () => this.#ui.openAlertSettings(this.#thresholds),
+            onCloseAlertSettings: () => this.#ui.closeAlertSettings(),
+            onSaveAlertSettings: () => this.#saveAlertSettings(),
+        });
+
+        this.#ui.resetDashboard();
+        this.#ui.updateClock();
+        setInterval(() => this.#ui.updateClock(), 1000);
+    }
+
+    /** Handles the connect/disconnect button click. */
+    #handleConnect() {
+        if (!this.#connector.isSupported()) {
+            alert("Web Serial API not supported by your browser. Please use Chrome or Edge.");
+            return;
+        }
+        this.#connector.toggleConnection();
+    }
+
+    /** Callback for when the device connection state changes. */
+    #handleConnectionStateChange(isConnected) {
+        this.#ui.setConnectionState(isConnected);
+        if (!isConnected) {
+            this.#ui.resetDashboard();
+            this.#historicalData = [];
+            this.#generateInitialHistoricalData();
+            this.#chart.update(this.#getFilteredDataForTimeRange());
+        }
+    }
+
+    /** Callback for when new data arrives from the serial connector. */
+    #handleSerialData(data) {
+        // Store previous values for trend calculation
+        this.#previousValues = {
+            temperature: { current: this.#sensorData.temperature.current },
+            humidity: { current: this.#sensorData.humidity.current },
+            pressure: { current: this.#sensorData.pressure.current }
+        };
+
+        // Update current sensor data
+        this.#sensorData.temperature.current = data.temperature;
+        this.#sensorData.humidity.current = data.humidity;
+        this.#sensorData.pressure.current = data.pressure;
+
+        // Update device info
+        this.#deviceInfo.firmwareVersion = data.firmware || this.#deviceInfo.firmwareVersion;
+        this.#deviceInfo.deviceId = data.deviceId || "Serial Device";
+        this.#deviceInfo.lastUpdate = new Date().toISOString();
+        this.#deviceInfo.signalStrength = data.signal; // e.g., expects a value like 85
+        this.#deviceInfo.batteryLevel = data.battery; // e.g., expects a value like 75
+
+        // Add to historical data for charting
+        const now = new Date();
+        this.#historicalData.push({
+            timestamp: now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            fullTimestamp: now,
+            temperature: data.temperature,
+            humidity: data.humidity,
+            pressure: data.pressure
+        });
+        // Limit historical data to prevent memory leaks
+        if (this.#historicalData.length > 5000) this.#historicalData.shift();
+
+        this.#checkAlerts();
+        this.#updateAllDisplays();
+    }
+
+    /** Updates all relevant parts of the UI. */
+    #updateAllDisplays() {
+        this.#ui.updateSensorCards(this.#sensorData, this.#previousValues, this.#thresholds, this.#sensorData);
+        this.#ui.updateDeviceInfo(this.#deviceInfo);
+        this.#ui.updateAlertsDisplay(this.#alerts);
+        this.#chart.update(this.#getFilteredDataForTimeRange());
+    }
+
+    /** Checks current sensor values against thresholds and creates alerts. */
+    #checkAlerts() {
+        ['temperature', 'humidity', 'pressure'].forEach(sensor => {
+            const current = this.#sensorData[sensor].current;
+            const threshold = this.#thresholds[sensor];
+            const critical = this.#sensorData[sensor];
+            const name = sensor.charAt(0).toUpperCase() + sensor.slice(1);
+
+            let alertType = null;
+            let message = '';
+
+            if (current <= critical.critical_min || current >= critical.critical_max) {
+                alertType = 'critical';
+                message = `${name} in critical range: ${current}${this.#sensorData[sensor].unit}`;
+            } else if (current <= threshold.min || current >= threshold.max) {
+                alertType = 'warning';
+                message = `${name} outside normal range: ${current}${this.#sensorData[sensor].unit}`;
+            }
+
+            if (alertType) {
+                this.#addAlert(alertType, sensor, message);
+            }
+        });
+    }
+
+    /** Adds a new alert, preventing rapid-fire duplicates. */
+    #addAlert(type, sensor, message) {
+        // Avoid creating the same alert within a 60-second window
+        const recentAlert = this.#alerts.find(alert =>
+            alert.sensor === sensor && (Date.now() - new Date(alert.fullTimestamp).getTime()) < 60000);
+
+        if (!recentAlert) {
+            const now = new Date();
+            const alert = {
+                timestamp: now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                fullTimestamp: now,
+                type, sensor, message
+            };
+            this.#alerts.unshift(alert);
+            if (this.#alerts.length > 50) this.#alerts.pop(); // Limit alert history
+        }
+    }
+
+    /** Handles saving new alert thresholds from the modal. */
+    #saveAlertSettings() {
+        this.#thresholds = this.#ui.getAlertSettingsValues();
+        this.#ui.closeAlertSettings();
+        console.log('Alert thresholds updated successfully');
+        this.#addAlert('info', 'System', 'Alert thresholds have been updated.');
+        this.#ui.updateAlertsDisplay(this.#alerts);
+    }
+
+    /** Populates historical data with null values for a clean chart start. */
+    #generateInitialHistoricalData() {
+        this.#historicalData = [];
+        const now = new Date();
+        for (let i = 60; i >= 0; i--) {
+            const timestamp = new Date(now.getTime() - (i * 60000));
+            this.#historicalData.push({
+                timestamp: timestamp.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                fullTimestamp: timestamp,
+                temperature: null, humidity: null, pressure: null
+            });
+        }
+    }
+
+    /** Filters historical data based on the selected time range. */
+    #getFilteredDataForTimeRange() {
+        const now = new Date();
+        let cutoffTime;
+        switch (this.#currentTimeRange) {
+            case '6H': cutoffTime = new Date(now.getTime() - 6 * 3600000); break;
+            case '24H': cutoffTime = new Date(now.getTime() - 24 * 3600000); break;
+            case '7D': cutoffTime = new Date(now.getTime() - 7 * 24 * 3600000); break;
+            case '1H':
+            default: cutoffTime = new Date(now.getTime() - 3600000); break;
+        }
+        return this.#historicalData.filter(item => item.fullTimestamp && item.fullTimestamp >= cutoffTime);
+    }
+
+    /** Changes the active time range for the chart. */
+    #changeTimeRange(timeRange) {
+        this.#currentTimeRange = timeRange;
+        this.#ui.updateActiveTimeRangeButton(timeRange);
+        this.#chart.update(this.#getFilteredDataForTimeRange());
+    }
+
+    /** Exports recent data as a JSON file. */
+    #exportData() {
         const dataToExport = {
             timestamp: new Date().toISOString(),
-            currentData: this.sensorData,
-            deviceInfo: this.deviceInfo,
-            historicalData: this.historicalData.slice(-100),
-            alerts: this.alerts.slice(0, 20)
+            currentData: this.#sensorData,
+            deviceInfo: this.#deviceInfo,
+            historicalData: this.#historicalData.slice(-100), // Export last 100 points
+            alerts: this.#alerts.slice(0, 20) // Export last 20 alerts
         };
         const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -1072,37 +744,11 @@ class IoTDashboard {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
-
-    openAlertSettings() {
-        document.getElementById('tempMin').value = this.thresholds.temperature.min;
-        document.getElementById('tempMax').value = this.thresholds.temperature.max;
-        document.getElementById('humidityMin').value = this.thresholds.humidity.min;
-        document.getElementById('humidityMax').value = this.thresholds.humidity.max;
-        document.getElementById('pressureMin').value = this.thresholds.pressure.min;
-        document.getElementById('pressureMax').value = this.thresholds.pressure.max;
-        document.getElementById('alertModal').classList.remove('hidden');
-    }
-
-    closeAlertSettings() {
-        document.getElementById('alertModal').classList.add('hidden');
-    }
-
-    saveAlertSettings() {
-        this.thresholds.temperature.min = parseFloat(document.getElementById('tempMin').value);
-        this.thresholds.temperature.max = parseFloat(document.getElementById('tempMax').value);
-        this.thresholds.humidity.min = parseFloat(document.getElementById('humidityMin').value);
-        this.thresholds.humidity.max = parseFloat(document.getElementById('humidityMax').value);
-        this.thresholds.pressure.min = parseFloat(document.getElementById('pressureMin').value);
-        this.thresholds.pressure.max = parseFloat(document.getElementById('pressureMax').value);
-        this.closeAlertSettings();
-        console.log('Alert thresholds updated successfully');
-        this.addAlert('info', 'System', 'Alert thresholds have been updated.');
-    }
 }
 
-// Initialize the dashboard when DOM is loaded
+
+// --- Application Entry Point ---
 document.addEventListener('DOMContentLoaded', () => {
-    const dashboard = new IoTDashboard();
-    // Make dashboard globally accessible for debugging
-    window.dashboard = dashboard;
+    const app = new IoTDashboard();
+    app.init();
 });

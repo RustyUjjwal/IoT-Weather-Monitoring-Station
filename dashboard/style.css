@@ -19,6 +19,14 @@
   --color-warning-rgb: 255, 183, 72; /* orange */
   --color-success-rgb: 106, 198, 249; /* Using blue for success */
   --color-info-rgb: 251, 237, 99; /* yellow */
+  
+  /* Chart Colors */
+  --chart-color-temp: var(--color-light-blue);
+  --chart-color-humidity: var(--color-yellow);
+  --chart-color-pressure: var(--color-orange);
+  --chart-bg-temp: rgba(var(--color-primary-rgb), 0.1);
+  --chart-bg-humidity: rgba(var(--color-info-rgb), 0.1);
+  --chart-bg-pressure: rgba(var(--color-warning-rgb), 0.1);
 
   /* Background color tokens */
   --color-bg-1: rgba(var(--color-primary-rgb), 0.1); /* Light blue */
@@ -50,7 +58,7 @@
   --color-warning: var(--color-orange);
   --color-info: var(--color-yellow);
   --color-focus-ring: rgba(var(--color-primary-rgb), 0.4);
-  --color-select-caret: rgba(var(--color-text-rgb), 0.8);
+  --color-select-caret: var(--select-caret-light);
 
   /* Common style patterns */
   --focus-ring: 0 0 0 3px var(--color-focus-ring);
@@ -58,6 +66,7 @@
   --status-bg-opacity: 0.15;
   --status-border-opacity: 0.25;
   --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23636154' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  --select-caret-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d1cfc7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 
   /* Typography */
   --font-family-base: "FKGroteskNeue", "Geist", "Inter", -apple-system,
@@ -124,6 +133,35 @@
   --container-xl: 1280px;
 }
 
+/* Dark Mode Color Definitions */
+body.dark-mode {
+  --color-background: #1a1b1d;
+  --color-surface: #202124;
+  --color-text: #d1cfc7;
+  --color-text-secondary: rgba(209, 207, 199, 0.7);
+  --color-border: #3c4043;
+  --color-card-border: #3c4043;
+  --color-card-border-inner: #5f6368;
+  --color-secondary: rgba(209, 207, 199, 0.1);
+  --color-secondary-hover: rgba(209, 207, 199, 0.15);
+  --color-secondary-active: rgba(209, 207, 199, 0.2);
+  --color-select-caret: var(--select-caret-dark);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2),
+    0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.2),
+    0 4px 6px -2px rgba(0, 0, 0, 0.1);
+  
+  /* Chart Colors for Dark Mode */
+  --chart-color-temp: #82cfff;
+  --chart-color-humidity: #ffde59;
+  --chart-color-pressure: #ffc46b;
+  --chart-bg-temp: rgba(130, 207, 255, 0.15);
+  --chart-bg-humidity: rgba(255, 222, 89, 0.15);
+  --chart-bg-pressure: rgba(255, 196, 107, 0.15);
+}
+
+
 /* Base styles */
 html {
   font-size: var(--font-size-base);
@@ -138,6 +176,8 @@ html {
 body {
   margin: 0;
   padding: 0;
+  background-color: var(--color-background);
+  transition: background-color var(--duration-normal), color var(--duration-normal);
 }
 
 *,
@@ -158,6 +198,7 @@ h6 {
   line-height: var(--line-height-tight);
   color: var(--color-text);
   letter-spacing: var(--letter-spacing-tight);
+  transition: color var(--duration-normal);
 }
 
 h1 {
@@ -308,7 +349,8 @@ pre code {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-base);
   transition: border-color var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard);
+    box-shadow var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-normal), color var(--duration-normal);
 }
 
 textarea.form-control {
@@ -321,7 +363,7 @@ select.form-control {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-  background-image: var(--select-caret-light);
+  background-image: var(--color-select-caret);
   background-repeat: no-repeat;
   background-position: right var(--space-12) center;
   background-size: 16px;
@@ -351,7 +393,9 @@ select.form-control {
   border: 1px solid var(--color-card-border);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  transition: box-shadow var(--duration-normal) var(--ease-standard);
+  transition: box-shadow var(--duration-normal) var(--ease-standard),
+              background-color var(--duration-normal),
+              border-color var(--duration-normal);
 }
 
 .card:hover {
@@ -366,6 +410,7 @@ select.form-control {
 .card__footer {
   padding: var(--space-16);
   border-bottom: 1px solid var(--color-card-border-inner);
+  transition: border-color var(--duration-normal);
 }
 
 /* Status indicators - simplified with CSS variables */
@@ -558,6 +603,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
+  transition: background-color var(--duration-normal), border-color var(--duration-normal);
 }
 
 .header-content {
@@ -566,17 +612,27 @@ body {
   align-items: center;
 }
 
-.header-title h1 {
-  margin: 0 0 var(--space-8) 0;
-  font-size: var(--font-size-3xl);
-  color: var(--color-text);
-}
-
 .header-status {
   display: flex;
   align-items: center;
   gap: var(--space-16);
   font-size: var(--font-size-sm);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-24);
+}
+
+#connectDeviceBtn {
+    gap: var(--space-8);
+}
+
+.header-title h1 {
+  margin: 0 0 var(--space-8) 0;
+  font-size: var(--font-size-3xl);
+  color: var(--color-text);
 }
 
 .status-dot {
@@ -641,9 +697,24 @@ body {
 }
 
 .sensor-card .sensor-icon {
-  font-size: 2.5rem;
   margin-bottom: var(--space-12);
 }
+.sensor-card .sensor-icon .material-symbols-outlined {
+    font-size: 40px; /* 2.5rem equivalent */
+    line-height: 1;
+}
+
+/* Themed Sensor Icons */
+.sensor-card[data-sensor="temperature"] .sensor-icon {
+    color: var(--color-primary);
+}
+.sensor-card[data-sensor="humidity"] .sensor-icon {
+    color: var(--color-info);
+}
+.sensor-card[data-sensor="pressure"] .sensor-icon {
+    color: var(--color-warning);
+}
+
 
 .sensor-info h3 {
   margin: 0 0 var(--space-12) 0;
@@ -716,6 +787,11 @@ body {
   grid-area: chart;
 }
 
+.chart-container {
+    position: relative;
+    height: 500px;
+}
+
 .device-info {
   grid-area: device;
 }
@@ -781,6 +857,7 @@ body {
   align-items: center;
   padding: var(--space-12) 0;
   border-bottom: 1px solid var(--color-card-border-inner);
+  transition: border-color var(--duration-normal);
 }
 
 .info-item:last-child {
@@ -831,6 +908,7 @@ body {
   border-radius: var(--radius-sm);
   position: relative;
   background: var(--color-surface);
+  transition: border-color var(--duration-normal), background-color var(--duration-normal);
 }
 
 .battery-indicator::after {
@@ -842,6 +920,7 @@ body {
   height: 6px;
   background: var(--color-border);
   border-radius: 0 1px 1px 0;
+  transition: background-color var(--duration-normal);
 }
 
 .battery-fill {
@@ -849,6 +928,7 @@ body {
   background: var(--color-success);
   border-radius: 1px;
   transition: width var(--duration-normal) var(--ease-standard);
+  width: 0%;
 }
 
 /* Control Panel */
@@ -866,6 +946,13 @@ body {
 
 .control-group .btn:last-child {
   margin-right: 0;
+}
+
+/* Add this to style.css */
+.control-panel .form-control:disabled,
+.control-panel .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 /* Alerts Section */
@@ -955,7 +1042,7 @@ body {
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
   transform: scale(1);
-  transition: transform var(--duration-normal) var(--ease-standard);
+  transition: transform var(--duration-normal) var(--ease-standard), background-color var(--duration-normal);
 }
 
 .modal.hidden .modal-content {
@@ -968,6 +1055,7 @@ body {
   align-items: center;
   padding: var(--space-20);
   border-bottom: 1px solid var(--color-card-border-inner);
+  transition: border-color var(--duration-normal);
 }
 
 .modal-header h3 {
@@ -1000,6 +1088,7 @@ body {
   gap: var(--space-12);
   padding: var(--space-20);
   border-top: 1px solid var(--color-card-border-inner);
+  transition: border-color var(--duration-normal);
 }
 
 .threshold-group {
@@ -1058,11 +1147,14 @@ body {
   .header-content {
     flex-direction: column;
     gap: var(--space-12);
+    align-items: flex-start;
   }
-
+  .theme-switcher {
+    align-self: flex-start;
+  }
   .header-status {
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
     gap: var(--space-8);
   }
 
@@ -1132,11 +1224,6 @@ body {
   to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-/* Chart.js custom styles */
-.chart-container canvas {
-  max-height: 300px !important;
-}
-
 /* Scrollbar styling */
 .alerts-list::-webkit-scrollbar {
   width: 6px;
@@ -1153,4 +1240,58 @@ body {
 
 .alerts-list::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-secondary);
+}
+
+
+/* Theme Switcher Styles */
+.theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    color: var(--color-text-secondary);
+}
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--color-mid-gray);
+    transition: var(--duration-normal);
+    border-radius: 24px;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: var(--duration-normal);
+    border-radius: 50%;
+}
+input:checked + .slider {
+    background-color: var(--color-primary);
+}
+input:focus-visible + .slider {
+    box-shadow: 0 0 1px var(--color-primary);
+}
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+body.dark-mode .slider {
+    background-color: #5f6368;
 }
