@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STM32 IoT Environmental Dashboard</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-title">
+                    <h1>STM32 IoT Environmental Dashboard</h1>
+                    <div class="header-status">
+                        <span class="status status--error" id="connectionStatus">
+                            <span class="status-dot" style="background-color: var(--color-error);"></span>
+                            Disconnected
+                        </span>
+                        <span class="timestamp" id="currentTime">--/--/---- --:--:--</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                     <button class="btn btn--primary" id="connectDeviceBtn">
+                        <span class="material-symbols-outlined">cable</span>
+                        Connect to Device
+                    </button>
+                    <div class="theme-switcher">
+                        <span class="material-symbols-outlined" aria-label="Switch to light mode">light_mode</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="themeToggle">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="material-symbols-outlined" aria-label="Switch to dark mode">dark_mode</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <div class="container">
+            <section class="sensor-cards">
+                <div class="sensor-card" data-sensor="temperature">
+                    <div class="sensor-icon">
+                        <span class="material-symbols-outlined">thermostat</span>
+                    </div>
+                    <div class="sensor-info">
+                        <h3>Temperature</h3>
+                        <div class="sensor-value">
+                            <span class="value" id="tempValue">--.-</span>
+                            <span class="unit">°C</span>
+                            <span class="trend" id="tempTrend"></span>
+                        </div>
+                        <div class="sensor-status" id="tempStatus">N/A</div>
+                    </div>
+                </div>
+
+                <div class="sensor-card" data-sensor="humidity">
+                    <div class="sensor-icon">
+                        <span class="material-symbols-outlined">water_drop</span>
+                    </div>
+                    <div class="sensor-info">
+                        <h3>Humidity</h3>
+                        <div class="sensor-value">
+                            <span class="value" id="humidityValue">--.-</span>
+                            <span class="unit">%</span>
+                            <span class="trend" id="humidityTrend"></span>
+                        </div>
+                        <div class="sensor-status" id="humidityStatus">N/A</div>
+                    </div>
+                </div>
+
+                <div class="sensor-card" data-sensor="pressure">
+                    <div class="sensor-icon">
+                        <span class="material-symbols-outlined">speed</span>
+                    </div>
+                    <div class="sensor-info">
+                        <h3>Pressure</h3>
+                        <div class="sensor-value">
+                            <span class="value" id="pressureValue">----.-</span>
+                            <span class="unit">hPa</span>
+                            <span class="trend" id="pressureTrend"></span>
+                        </div>
+                        <div class="sensor-status" id="pressureStatus">N/A</div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="dashboard-grid">
+                <section class="chart-section card">
+                    <div class="card__header">
+                        <h3>Historical Data</h3>
+                        <div class="time-controls">
+                            <button class="btn btn--sm time-btn active" data-time="1H">1H</button>
+                            <button class="btn btn--sm time-btn" data-time="6H">6H</button>
+                            <button class="btn btn--sm time-btn" data-time="24H">24H</button>
+                            <button class="btn btn--sm time-btn" data-time="7D">7D</button>
+                        </div>
+                    </div>
+                    <div class="card__body">
+                        <div class="chart-container">
+                            <canvas id="sensorChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="device-info card">
+                    <div class="card__header">
+                        <h3>Device Information</h3>
+                    </div>
+                    <div class="card__body">
+                        <div class="info-item">
+                            <span class="label">Device ID:</span>
+                            <span class="value" id="deviceId">N/A</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Firmware:</span>
+                            <span class="value" id="firmwareVersion">N/A</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Last Update:</span>
+                            <span class="value" id="lastUpdate">N/A</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Signal Strength:</span>
+                            <div class="signal-strength">
+                                <span class="value" id="signalStrength">--%</span>
+                                <div class="signal-bars">
+                                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Battery Level:</span>
+                            <div class="battery-level">
+                                <span class="value" id="batteryLevel">--%</span>
+                                <div class="battery-indicator">
+                                    <div class="battery-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="control-panel card">
+                    <div class="card__header">
+                        <h3>Control Panel</h3>
+                    </div>
+                    <div class="card__body">
+                        <div class="control-group">
+                            <label class="form-label">Refresh Rate</label>
+                            <select class="form-control" id="refreshRate" title="Disabled during live serial connection">
+                                <option value="1000">1 second</option>
+                                <option value="5000" selected>5 seconds</option>
+                                <option value="30000">30 seconds</option>
+                                <option value="60000">60 seconds</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label class="form-label">Data Collection</label>
+                            <button class="btn btn--secondary" id="toggleCollection" title="Disabled during live serial connection">
+                                <span id="collectionStatus">Start</span> Collection
+                            </button>
+                        </div>
+                        <div class="control-group">
+                            <button class="btn btn--secondary" id="exportData">Export Data</button>
+                            <button class="btn btn--outline" id="alertSettings">Alert Settings</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="alerts-section card">
+                    <div class="card__header">
+                        <h3>Recent Alerts</h3>
+                    </div>
+                    <div class="card__body">
+                        <div class="alerts-list" id="alertsList">
+                           <div class="alert-item info"><div class="alert-content"><div class="alert-message">No alerts to display</div></div></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+    
+    <div class="modal hidden" id="alertModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Alert Threshold Settings</h3>
+                <button class="modal-close" id="closeAlertModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="threshold-group">
+                    <h4>Temperature (°C)</h4>
+                    <div class="threshold-inputs">
+                        <div class="input-group"><label>Min:</label><input type="number" class="form-control" id="tempMin" value="18"></div>
+                        <div class="input-group"><label>Max:</label><input type="number" class="form-control" id="tempMax" value="28"></div>
+                    </div>
+                </div>
+                <div class="threshold-group">
+                    <h4>Humidity (%)</h4>
+                    <div class="threshold-inputs">
+                        <div class="input-group"><label>Min:</label><input type="number" class="form-control" id="humidityMin" value="45"></div>
+                        <div class="input-group"><label>Max:</label><input type="number" class="form-control" id="humidityMax" value="75"></div>
+                    </div>
+                </div>
+                <div class="threshold-group">
+                    <h4>Pressure (hPa)</h4>
+                    <div class="threshold-inputs">
+                        <div class="input-group"><label>Min:</label><input type="number" class="form-control" id="pressureMin" value="995"></div>
+                        <div class="input-group"><label>Max:</label><input type="number" class="form-control" id="pressureMax" value="1015"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--secondary" id="cancelSettings">Cancel</button>
+                <button class="btn btn--primary" id="saveSettings">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
