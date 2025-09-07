@@ -124,7 +124,7 @@ class IoTDataProcessor:
             client.subscribe([(SENSOR_DATA_TOPIC, 0), (DEVICE_STATUS_TOPIC, 0)])
             logger.info(f"Subscribed to topics")
         else:
-            logger.error(f"❌ MQTT connection failed with code: {rc}")
+            logger.error(f" MQTT connection failed with code: {rc}")
 
     def on_mqtt_disconnect(self, client, userdata, rc):
         logger.warning(f"Disconnected from MQTT broker (code: {rc})")
@@ -160,9 +160,9 @@ class IoTDataProcessor:
                 self.check_sensor_alerts(device_id, data)
             logger.info(f"Processed data from {device_id}")
         except json.JSONDecodeError:
-            logger.error(f"❌ Invalid JSON: {payload}")
+            logger.error(f" Invalid JSON: {payload}")
         except Exception as e:
-            logger.error(f"❌ Error processing sensor data: {e}")
+            logger.error(f" Error processing sensor data: {e}")
 
     def store_sensor_data(self, device_id, timestamp, data):
         try:
@@ -200,15 +200,15 @@ async def main_async():
     await server.wait_closed()
 
 def main():
-    print("========================================")
-    print("STM32 IoT Monitoring Server v2.1")
-    print("========================================")
+    print("=============================")
+    print("ESP32 IoT Monitoring Server")
+    print("=============================")
     try:
         asyncio.run(main_async())
     except KeyboardInterrupt:
-        logger.info("hutting down.")
+        logger.info("shutting down.")
     except Exception as e:
-        logger.error(f"❌ An unexpected error occurred: {e}")
+        logger.error(f" An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
     main()
